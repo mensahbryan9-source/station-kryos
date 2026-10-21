@@ -15,9 +15,9 @@ Tout (textures, sprites, armes, sons, musique, icônes) est **généré par le c
 
 ## L'histoire
 
-La station minière KRYOS, en orbite d'une lune de glace, ne répond plus. Ses automates ont été réécrits par
-une intelligence hostile : **l'Archonte**. Traversez trois secteurs — le quai d'amarrage, les laboratoires
-cryogéniques et le cœur du réacteur — pour la détruire.
+Minuit, la nuit d'Halloween. Le portail du vieux cimetière s'est refermé derrière vous. Traversez les
+catacombes, terrassez le Gardien de la crypte, perdez-vous dans les jardins du manoir, puis affrontez
+**le Roi Citrouille** dans la salle de bal avant que la lampe ne s'éteigne pour de bon.
 
 ## Fonctionnalités
 
