@@ -432,3 +432,5 @@ export function buildSprites() {
   for (const k in WEAPON_DRAW) S.weapon[k] = WEAPON_DRAW[k].map(weaponCanvas);
   return S;
 }
+
+export { sprite, ell, shadow, sparks, bright, enemyFrames, weaponCanvas, flash, body, lerp };

@@ -244,8 +244,12 @@ export class Renderer {
             let ss = base + ((fl * cone[cxv + RT[y]]) >> 8); if (ss > 256) ss = 256;
             out = 0xff000000 | ((b * ss + fb) >> 8) << 16 | ((g * ss + fg) >> 8) << 8 | ((r * ss + fr) >> 8);
           }
-          // Fantômes : mélange 50/50 avec le décor derrière.
-          buf[o] = ghost ? 0xff000000 | (((buf[o] & 0xfefefe) >> 1) + ((out & 0xfefefe) >> 1)) : out;
+          if (ghost) {
+            // Fantômes : ~1/3 d'opacité par-dessus le décor.
+            const bg = buf[o];
+            buf[o] = 0xff000000 | (((((bg >> 16) & 255) * 11 + ((out >> 16) & 255) * 5) >> 4) << 16) |
+              (((((bg >> 8) & 255) * 11 + ((out >> 8) & 255) * 5) >> 4) << 8) | ((((bg & 255) * 11 + (out & 255) * 5) >> 4));
+          } else buf[o] = out;
         }
       }
     }

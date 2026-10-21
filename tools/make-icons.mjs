@@ -79,10 +79,60 @@ function render(size, { inset = 1, rounded = true, transparent = false }) {
   });
 }
 
+// ——— Motif « citrouille » du Manoir des Ombres ———
+const inEll = (u, v, cx, cy, rx, ry) => ((u - cx) / rx) ** 2 + ((v - cy) / ry) ** 2 <= 1;
+const inTri = (u, v, [ax, ay], [bx, by], [cx, cy]) => {
+  const s = (px, py, qx, qy, rx, ry) => (px - rx) * (qy - ry) - (qx - rx) * (py - ry);
+  const d1 = s(u, v, ax, ay, bx, by), d2 = s(u, v, bx, by, cx, cy), d3 = s(u, v, cx, cy, ax, ay);
+  return !((d1 < 0 || d2 < 0 || d3 < 0) && (d1 > 0 || d2 > 0 || d3 > 0));
+};
+function pumpkinColor(u, v) {
+  // fond : nuit violette et lune
+  const rr = Math.hypot(u, v);
+  let c = [20 + 30 * (1 - rr * 0.6), 6 + 10 * (1 - rr * 0.6), 30 + 40 * (1 - rr * 0.6)];
+  if (Math.hypot(u - 0.48, v + 0.5) < 0.2) c = [235, 225, 200];
+  const body = inEll(u, v, 0, 0.12, 0.62, 0.52) || inEll(u, v, -0.3, 0.14, 0.38, 0.48) || inEll(u, v, 0.3, 0.14, 0.38, 0.48);
+  if (inTri(u, v, [-0.06, -0.38], [0.08, -0.38], [0.06, -0.62]) || (u > -0.06 && u < 0.07 && v > -0.6 && v < -0.36)) c = [70, 110, 30];
+  if (body) {
+    const shade = 0.65 + 0.35 * (1 - Math.min(1, Math.hypot(u + 0.2, v - 0.0) / 0.8));
+    c = [250 * shade, 120 * shade, 20 * shade];
+    const sideRib = Math.abs(Math.abs(u) - 0.3) < 0.015;
+    if (sideRib) c = c.map((x) => x * 0.7);
+    const glow = [255, 214, 70];
+    if (inTri(u, v, [-0.42, 0.02], [-0.1, 0.02], [-0.26, -0.22]) || inTri(u, v, [0.1, 0.02], [0.42, 0.02], [0.26, -0.22])) c = glow;
+    if (inTri(u, v, [-0.08, 0.12], [0.08, 0.12], [0, 0.0])) c = glow;
+    // bouche dentelée
+    if (v > 0.2 && v < 0.42 && Math.abs(u) < 0.42 - (v - 0.2) * 0.4) {
+      const tooth = (v < 0.27 && Math.floor((u + 0.42) / 0.14) % 2 === 1) || (v > 0.35 && Math.floor((u + 0.42) / 0.14) % 2 === 0);
+      if (!tooth) c = glow;
+    }
+  }
+  return c;
+}
+function renderPumpkin(size, { inset = 1, rounded = true }) {
+  const SS = 3;
+  return png(size, (x, y) => {
+    const acc = [0, 0, 0, 0];
+    for (let sy = 0; sy < SS; sy++) for (let sx = 0; sx < SS; sx++) {
+      const u = ((x + (sx + 0.5) / SS) / size) * 2 - 1, v = ((y + (sy + 0.5) / SS) / size) * 2 - 1;
+      let a = 255;
+      if (rounded) { const k = 0.36, qx = Math.max(Math.abs(u) - (1 - k), 0), qy = Math.max(Math.abs(v) - (1 - k), 0); if (Math.hypot(qx, qy) > k) a = 0; }
+      const c = pumpkinColor(u / (0.9 * inset), v / (0.9 * inset));
+      acc[0] += c[0]; acc[1] += c[1]; acc[2] += c[2]; acc[3] += a;
+    }
+    return acc.map((c) => Math.round(Math.min(255, c / (SS * SS))));
+  });
+}
+
+// Motif actif : 'pumpkin' (Halloween) ou 'emblem' (ancienne station Kryos).
+const DESIGN = process.argv[2] || 'pumpkin';
+const draw = DESIGN === 'emblem' ? render : renderPumpkin;
+
 mkdirSync('icons', { recursive: true });
-writeFileSync('icons/icon-192.png', render(192, {}));
-writeFileSync('icons/icon-512.png', render(512, {}));
-writeFileSync('icons/icon-maskable-512.png', render(512, { inset: 0.72, rounded: false }));
-writeFileSync('icons/apple-touch-icon.png', render(180, { rounded: false }));
-writeFileSync('icons/favicon.svg', `<svg xmlns="http://www.w3.org/2000/svg" viewBox="-1 -1 2 2"><rect x="-1" y="-1" width="2" height="2" rx=".36" fill="#071420"/><g stroke="#8ef0ff" stroke-linecap="round" fill="none">${segs.map(({ s, w }) => `<line x1="${(s[0] * 0.82).toFixed(3)}" y1="${(s[1] * 0.82).toFixed(3)}" x2="${(s[2] * 0.82).toFixed(3)}" y2="${(s[3] * 0.82).toFixed(3)}" stroke-width="${(w * 1.64).toFixed(3)}"/>`).join('')}</g></svg>\n`);
-console.log('Icônes générées dans icons/');
+writeFileSync('icons/icon-192.png', draw(192, {}));
+writeFileSync('icons/icon-512.png', draw(512, {}));
+writeFileSync('icons/icon-maskable-512.png', draw(512, { inset: 0.72, rounded: false }));
+writeFileSync('icons/apple-touch-icon.png', draw(180, { rounded: false }));
+if (DESIGN === 'emblem') writeFileSync('icons/favicon.svg', `<svg xmlns="http://www.w3.org/2000/svg" viewBox="-1 -1 2 2"><rect x="-1" y="-1" width="2" height="2" rx=".36" fill="#071420"/><g stroke="#8ef0ff" stroke-linecap="round" fill="none">${segs.map(({ s, w }) => `<line x1="${(s[0] * 0.82).toFixed(3)}" y1="${(s[1] * 0.82).toFixed(3)}" x2="${(s[2] * 0.82).toFixed(3)}" y2="${(s[3] * 0.82).toFixed(3)}" stroke-width="${(w * 1.64).toFixed(3)}"/>`).join('')}</g></svg>\n`);
+else writeFileSync('icons/favicon.svg', `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="12" fill="#1a0a24"/><g fill="#f07a14"><ellipse cx="32" cy="36" rx="20" ry="17"/><ellipse cx="22" cy="37" rx="12" ry="15"/><ellipse cx="42" cy="37" rx="12" ry="15"/></g><rect x="30" y="14" width="4" height="8" fill="#4a7a1e"/><g fill="#ffd646"><path d="M19 33h9l-4.5-7z"/><path d="M36 33h9l-4.5-7z"/><path d="M20 40h24l-3 7H23z"/></g></svg>\n`);
+console.log(`Icônes générées dans icons/ (motif ${DESIGN})`);

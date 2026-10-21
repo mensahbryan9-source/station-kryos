@@ -1,9 +1,10 @@
 // Service worker : met tout le jeu en cache pour un fonctionnement hors connexion.
-const VERSION = 'kryos-v1';
+const VERSION = 'manoir-v2';
 const FILES = [
   './', 'index.html', 'manifest.webmanifest', 'css/style.css',
   'js/main.js', 'js/game.js', 'js/world.js', 'js/renderer.js', 'js/textures.js',
   'js/sprites.js', 'js/audio.js', 'js/input.js', 'js/levels.js', 'js/config.js', 'js/scoring.js',
+  'js/textures-halloween.js', 'js/sprites-halloween.js',
   'icons/icon-192.png', 'icons/icon-512.png', 'icons/icon-maskable-512.png',
   'icons/apple-touch-icon.png', 'icons/favicon.svg',
 ];

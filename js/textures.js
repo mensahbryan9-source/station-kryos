@@ -344,4 +344,4 @@ export function buildTextures() {
   return out;
 }
 
-export { canvas, plate, rivet };
+export { canvas, plate, rivet, make, noise, chain, emissive };

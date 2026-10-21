@@ -2,6 +2,9 @@
 import { LEVELS } from './levels.js';
 import { buildTextures } from './textures.js';
 import { buildSprites } from './sprites.js';
+import { buildHalloweenTextures } from './textures-halloween.js';
+import { buildHalloweenSprites } from './sprites-halloween.js';
+import { CONFIG } from './config.js';
 import { Renderer } from './renderer.js';
 import { Game, WEAPONS, DIFFICULTY, newPlayerState } from './game.js';
 import { Input } from './input.js';
@@ -13,11 +16,11 @@ const app = $('#app');
 const view = $('#view');
 
 // ——— Sauvegarde locale ———
-const SAVE_KEY = 'kryos-save-v1';
+const SAVE_KEY = 'manoir-save-v1';
 const isTouch = matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window;
 const defaults = {
   unlocked: 1, best: 0,
-  opts: { sens: 1, fov: 70, sfx: 0.8, music: 0.5, quality: 'auto', minimap: true, touch: isTouch },
+  opts: { sens: 1, fov: 70, sfx: 0.8, music: 0.5, quality: 'auto', minimap: true, touch: isTouch, scares: true },
 };
 let save;
 try { save = { ...defaults, ...JSON.parse(localStorage.getItem(SAVE_KEY) || '{}') }; save.opts = { ...defaults.opts, ...save.opts }; }
@@ -25,10 +28,14 @@ catch { save = structuredClone(defaults); }
 const persist = () => { try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch { /* stockage indisponible */ } };
 
 // ——— Ressources ———
-const textures = buildTextures();
+const textures = { ...buildTextures(), ...buildHalloweenTextures() };
 const texList = [null], texIndex = {};
 for (const name of Object.keys(textures)) { texIndex[name] = texList.length; texList.push(textures[name]); }
-const assets = { texList, texIndex, sprites: buildSprites() };
+// Thème Halloween par-dessus les sprites d'origine (conservés pour les clés non redéfinies).
+const baseSprites = buildSprites(), halloween = buildHalloweenSprites();
+const sprites = {};
+for (const k of Object.keys(baseSprites)) sprites[k] = { ...baseSprites[k], ...halloween[k] };
+const assets = { texList, texIndex, sprites };
 const renderer = new Renderer(view);
 const input = new Input(view, $('#touch'));
 $('#loading').remove();
@@ -61,9 +68,39 @@ const ui = {
     h.style.transition = 'none'; h.style.transform = `rotate(${rel + Math.PI / 2}rad)`; h.style.opacity = 1;
     requestAnimationFrame(() => { h.style.transition = 'opacity .8s'; h.style.opacity = 0; });
   },
-  died() { setTimeout(() => showScreen('dead'), 50); input.unlock(); audio.stopMusic(); state = 'dead'; },
+  died() { setTimeout(() => showScreen('dead'), 50); input.unlock(); audio.stopMusic(); audio.stopAmbience(); state = 'dead'; },
   levelComplete(res) { onLevelComplete(res); },
+  get scaresEnabled() { return save.opts.scares; },
+  scare(kind) {
+    if (!save.opts.scares) return;
+    const el = $('#scare');
+    el.className = ''; void el.offsetWidth;
+    if (kind === 'face') { drawScareFace(); el.className = 'face'; }
+    else if (kind === 'ghost') el.className = 'white';
+    else return;
+    setTimeout(() => (el.className = ''), kind === 'face' ? 420 : 250);
+  },
 };
+
+// Visage du jump scare, dessiné une fois à la demande.
+let faceDrawn = false;
+function drawScareFace() {
+  if (faceDrawn) return;
+  faceDrawn = true;
+  const c = $('#scare canvas'), g = c.getContext('2d');
+  const W = c.width, H = c.height;
+  g.fillStyle = '#000'; g.fillRect(0, 0, W, H);
+  const grd = g.createRadialGradient(W / 2, H * 0.45, 20, W / 2, H * 0.5, W * 0.4);
+  grd.addColorStop(0, '#d8d4c8'); grd.addColorStop(0.7, '#8a8678'); grd.addColorStop(1, '#000');
+  g.fillStyle = grd; g.beginPath(); g.ellipse(W / 2, H * 0.5, W * 0.24, H * 0.42, 0, 0, 7); g.fill();
+  for (const s of [-1, 1]) {
+    g.fillStyle = '#000'; g.beginPath(); g.ellipse(W / 2 + s * W * 0.09, H * 0.4, W * 0.06, H * 0.09, s * 0.25, 0, 7); g.fill();
+    g.fillStyle = '#ff1a1a'; g.beginPath(); g.arc(W / 2 + s * W * 0.09, H * 0.42, W * 0.008, 0, 7); g.fill();
+  }
+  g.fillStyle = '#000'; g.beginPath(); g.ellipse(W / 2, H * 0.72, W * 0.07, H * 0.13, 0, 0, 7); g.fill();
+  g.strokeStyle = 'rgba(60,0,0,.8)'; g.lineWidth = 3;
+  for (let i = 0; i < 6; i++) { g.beginPath(); g.moveTo(W / 2 + (i - 3) * 12, H * 0.62); g.lineTo(W / 2 + (i - 3) * 10, H * 0.85); g.stroke(); }
+}
 
 // ——— Écrans ———
 function showScreen(name, push = false) {
@@ -132,6 +169,7 @@ function startLevel() {
   setPlaying(true);
   audio.init();
   audio.startMusic(L.music);
+  audio.startAmbience(L.ceiling === 'nightSky' ? 'outdoor' : 'indoor');
   audio.muffle(false);
   $('#h-level').textContent = session.levelIndex + 1;
   ui.message(`${L.subtitle}`, 'secret');
@@ -180,7 +218,7 @@ function toTitle() {
   input.enabled = false; input.unlock();
   app.classList.remove('playing');
   $('#hud').hidden = true; $('#touch').hidden = true; $('#bossbar').hidden = true;
-  audio.stopMusic();
+  audio.stopMusic(); audio.stopAmbience();
   screenStack = [];
   showScreen('title');
   updateBest();
@@ -215,7 +253,7 @@ $('#i-next').onclick = () => {
 
 function victory() {
   state = 'victory';
-  audio.stopMusic();
+  audio.stopMusic(); audio.stopAmbience();
   audio.play('exit');
   const score = session.inventory.score;
   save.best = Math.max(save.best, score); persist();
@@ -223,11 +261,11 @@ function victory() {
   $('#v-time').textContent = fmtTime(session.totalTime);
   $('#v-diff').textContent = DIFFICULTY[session.difficulty].name;
   showScreen('victory');
-  startAttract(2);
+  startAttract(4);
 }
 
 const fmtTime = (t) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}`;
-function updateBest() { $('#best').textContent = save.best ? `Meilleur score : ${save.best.toLocaleString('fr-FR')}` : 'Une station minière. Un signal perdu. Aucun renfort.'; }
+function updateBest() { $('#best').textContent = save.best ? `Meilleur score : ${save.best.toLocaleString('fr-FR')}` : 'Une nuit. Un manoir. Aucune issue.'; }
 
 // ——— Touches globales ———
 addEventListener('keydown', (e) => {
@@ -264,6 +302,7 @@ bindOption('#o-music', 'music', (v) => Math.round(v * 100) + ' %');
 bindOption('#o-quality', 'quality');
 bindOption('#o-minimap', 'minimap');
 bindOption('#o-touch', 'touch');
+bindOption('#o-scares', 'scares');
 function applyOptions() {
   input.sensitivity = save.opts.sens;
   renderer.fov = save.opts.fov;
@@ -306,7 +345,7 @@ function drawWeapon(ctx, w, h) {
 }
 
 // ——— HUD ———
-const H = { bat: $('#h-bat'), health: $('#h-health'), armor: $('#h-armor'), ammo: $('#h-ammo'), wname: $('#h-wname'), score: $('#h-score'), kb: $('#k-blue'), kr: $('#k-red'), bossbar: $('#bossbar'), bossfill: $('#bossbar i') };
+const H = { bat: $('#h-bat'), health: $('#h-health'), armor: $('#h-armor'), ammo: $('#h-ammo'), wname: $('#h-wname'), score: $('#h-score'), kb: $('#k-blue'), kr: $('#k-red'), bossbar: $('#bossbar'), bossfill: $('#bossbar i'), bossname: $('#bossbar span') };
 const last = {};
 function setText(el, key, v) { if (last[key] !== v) { last[key] = v; el.textContent = v; } }
 function updateHud() {
@@ -327,6 +366,7 @@ function updateHud() {
   const b = game.boss;
   const showBoss = b && b.state !== 'idle' && b.state !== 'dead';
   H.bossbar.hidden = !showBoss;
+  if (showBoss) setText(H.bossname, 'bn', b.d.name.toUpperCase());
   if (showBoss) H.bossfill.style.width = Math.max(0, (b.hp / (b.d.hp * DIFFICULTY[session.difficulty].hp)) * 100) + '%';
 }
 
@@ -335,7 +375,7 @@ const ecg = $('#ecg').getContext('2d');
 let ecgX = 0, ecgPhase = 0;
 function drawEcg(dt) {
   const p = game.player;
-  const rate = p.dead ? 0 : 1.2 + (100 - p.health) / 40;
+  const rate = p.dead ? 0 : 1.2 + (100 - p.health) / 40 + (game.fear || 0) * 1.6;
   const col = p.health > 60 ? '#36ff9a' : p.health > 25 ? '#ffb02e' : '#ff3b4e';
   const W = 120, Hh = 40;
   ecg.fillStyle = 'rgba(5,10,16,.25)'; ecg.fillRect(0, 0, W, Hh);
@@ -402,8 +442,8 @@ function startAttract(levelIndex = 0) {
   attract = new Game({ level: L, levelIndex, assets, inventory: newPlayerState(L.loadout), difficulty: 1, ui: { message() {}, flash() {}, hurtFrom() {}, died() {}, levelComplete() {} } });
   const p = attract.player;
   // point de vue : le hangar du niveau 1 ou l'arène finale
-  if (levelIndex === 0) { p.x = 21.5; p.y = 5.5; } else { p.x = 23.5; p.y = 9.5; }
-  attract.enemies = attract.enemies.filter((e) => Math.hypot(e.x - p.x, e.y - p.y) > 4 && e.t !== 'O');
+  if (levelIndex === 0) { p.x = 21.5; p.y = 5.5; } else { p.x = 17.5; p.y = 8.5; }
+  attract.enemies = attract.enemies.filter((e) => Math.hypot(e.x - p.x, e.y - p.y) > 4 && e.d.kind !== 'boss');
   p.a = -Math.PI / 2;
 }
 
@@ -470,4 +510,4 @@ showScreen('title');
 requestAnimationFrame(frame);
 
 // Point d'accès pour les tests automatisés.
-window.__kryos = { get game() { return game; }, get state() { return state; }, startLevel: (i, d = 1) => { session = { difficulty: d, levelIndex: i, inventory: newPlayerState(LEVELS[i].loadout), totalTime: 0 }; startLevel(); }, LEVELS };
+window.__manoir = window.__kryos = { get game() { return game; }, get state() { return state; }, startLevel: (i, d = 1) => { session = { difficulty: d, levelIndex: i, inventory: newPlayerState(LEVELS[i].loadout), totalTime: 0 }; startLevel(); }, LEVELS };

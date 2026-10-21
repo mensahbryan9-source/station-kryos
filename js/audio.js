@@ -123,7 +123,7 @@ class Audio {
         // arpège
         if (pos % 2 === 0 && Math.random() < 0.8) {
           const deg = cfg.scale[(step * 3 + bar) % cfg.scale.length];
-          this.osc('square', midi(chordRoot + 12 + deg + (pos > 8 ? 12 : 0)), midi(chordRoot + 12 + deg), beat * 0.9, 0.035, lp, next - ctx.currentTime);
+          this.osc(cfg.arp || 'square', midi(chordRoot + 12 + deg + (pos > 8 ? 12 : 0)), midi(chordRoot + 12 + deg), beat * 0.9, 0.035, lp, next - ctx.currentTime);
         }
         // percussions
         if (pos % 8 === 0) this.osc('sine', 120, 40, 0.25, 0.5, this.mus, next - ctx.currentTime);
@@ -139,6 +139,41 @@ class Audio {
   stopMusic() {
     if (this.seqTimer) clearInterval(this.seqTimer);
     this.seqTimer = null;
+  }
+
+  // ——— Ambiance de fond : vent (extérieur) ou bourdon (intérieur) + bruits aléatoires ———
+  startAmbience(kind) {
+    this.stopAmbience();
+    if (!this.ctx) return;
+    const ctx = this.ctx;
+    const src = ctx.createBufferSource(); src.buffer = this.noiseBuf; src.loop = true;
+    const f = ctx.createBiquadFilter(); f.type = 'bandpass'; f.Q.value = kind === 'outdoor' ? 0.7 : 2.5;
+    f.frequency.value = kind === 'outdoor' ? 420 : 140;
+    const g = ctx.createGain(); g.gain.value = kind === 'outdoor' ? 0.16 : 0.1;
+    const lfo = ctx.createOscillator(), lg = ctx.createGain();
+    lfo.frequency.value = 0.13; lg.gain.value = kind === 'outdoor' ? 260 : 40;
+    lfo.connect(lg); lg.connect(f.frequency);
+    src.connect(f); f.connect(g); g.connect(this.sfx);
+    src.start(); lfo.start();
+    const nodes = [src, lfo];
+    if (kind !== 'outdoor') {
+      const o = ctx.createOscillator(); o.type = 'sine'; o.frequency.value = 46;
+      const og = ctx.createGain(); og.gain.value = 0.05; o.connect(og); og.connect(this.sfx); o.start(); nodes.push(o);
+    }
+    this.amb = { nodes, timer: setInterval(() => {
+      if (Math.random() < 0.55) return;
+      const pool = AMBIENT_EVENTS[kind] || AMBIENT_EVENTS.indoor;
+      const name = pool[(Math.random() * pool.length) | 0];
+      const a = Math.random() * 6.28, d = 4 + Math.random() * 8, L = this.listener;
+      this.play(name, { x: L.x + Math.cos(a) * d, y: L.y + Math.sin(a) * d }, 0.8);
+    }, 5000) };
+  }
+
+  stopAmbience() {
+    if (!this.amb) return;
+    clearInterval(this.amb.timer);
+    for (const n of this.amb.nodes) try { n.stop(); } catch { /* déjà arrêté */ }
+    this.amb = null;
   }
 
   muffle(on) { if (this.musFilter) this.musFilter.frequency.value = on ? 450 : 1400; }
@@ -196,6 +231,57 @@ const SOUNDS = {
   select: (a, o) => { a.osc('square', 660, 660, 0.05, 0.14, o); a.osc('square', 1320, 1320, 0.07, 0.14, o, 0.05); },
   step: (a, o) => a.noise(0.05, 0.06, o, { type: 'bandpass', f0: 700, f1: 400, q: 2 }),
   switchW: (a, o) => a.noise(0.08, 0.25, o, { type: 'bandpass', f0: 2500, f1: 1200, q: 3 }),
+};
+
+// ——— Sons du thème Halloween (remplacent ceux de la station portant le même nom) ———
+const vibrato = (a, o, f0, f1, dur, vol, rate = 6, depth = 20, type = 'sine') => {
+  const ctx = a.ctx, now = ctx.currentTime;
+  const osc = a.osc(type, f0, f1, dur, vol, o, 0, 0.08);
+  const l = ctx.createOscillator(), lg = ctx.createGain();
+  l.frequency.value = rate; lg.gain.value = depth; l.connect(lg); lg.connect(osc.frequency);
+  l.start(now); l.stop(now + dur + 0.1);
+};
+Object.assign(SOUNDS, {
+  blade: (a, o) => { a.noise(0.2, 0.6, o, { type: 'bandpass', f0: 2500, f1: 600, q: 2 }); },
+  pistol: (a, o) => { a.noise(0.35, 1.0, o, { f0: 6000, f1: 200 }); a.osc('sine', 160, 50, 0.25, 0.7, o); },
+  rifle: (a, o) => { a.noise(0.14, 0.7, o, { f0: 7000, f1: 500 }); a.osc('sine', 200, 70, 0.1, 0.4, o); },
+  arc: (a, o) => { a.noise(0.8, 0.9, o, { type: 'bandpass', f0: 500, f1: 1400, q: 0.8 }); a.noise(0.6, 0.5, o, { f0: 300, f1: 90 }); },
+  ecto: (a, o) => vibrato(a, o, 700, 300, 0.45, 0.25, 9, 40),
+  seed: (a, o) => { a.noise(0.25, 0.5, o, { type: 'bandpass', f0: 1800, f1: 700, q: 2 }); a.osc('triangle', 500, 200, 0.2, 0.2, o); },
+  skullfire: (a, o) => { vibrato(a, o, 220, 110, 0.7, 0.35, 5, 25, 'sawtooth'); },
+  fireball: (a, o) => { a.noise(0.9, 0.9, o, { type: 'bandpass', f0: 300, f1: 900, q: 1 }); a.osc('sawtooth', 110, 55, 0.7, 0.3, o); },
+  alert_g: (a, o) => vibrato(a, o, 380, 760, 1.4, 0.3, 5, 30),
+  alert_s: (a, o) => { for (let i = 0; i < 4; i++) a.osc('square', 520 - i * 30, 420 - i * 30, 0.09, 0.18, o, i * 0.13); },
+  alert_m: (a, o) => { vibrato(a, o, 95, 70, 1.2, 0.5, 3, 8, 'sawtooth'); a.noise(1, 0.25, o, { type: 'bandpass', f0: 500, f1: 300, q: 4 }); },
+  alert_G: (a, o) => { for (const f of [55, 82, 110]) vibrato(a, o, f, f * 0.98, 2.2, 0.25, 2, 3, 'sawtooth'); a.noise(2, 0.3, o, { type: 'bandpass', f0: 900, f1: 400, q: 6 }); },
+  alert_O: (a, o) => { a.osc('sawtooth', 70, 35, 1.6, 0.7, o); for (let i = 0; i < 6; i++) a.osc('square', 300 - i * 15, 240 - i * 15, 0.1, 0.22, o, 0.5 + i * 0.14); },
+  die_g: (a, o) => vibrato(a, o, 900, 120, 1.1, 0.3, 8, 60),
+  die_s: (a, o) => { a.noise(0.5, 0.8, o, { f0: 2000, f1: 150 }); a.osc('sine', 180, 40, 0.3, 0.5, o); },
+  die_m: (a, o) => { a.noise(0.8, 0.6, o, { type: 'bandpass', f0: 700, f1: 120, q: 3 }); vibrato(a, o, 90, 40, 0.9, 0.4, 7, 10, 'sawtooth'); },
+  die_G: (a, o) => { for (let i = 0; i < 4; i++) a.noise(1, 0.8, o, { type: 'bandpass', f0: 3000, f1: 300, q: 2, t: i * 0.3 }); vibrato(a, o, 300, 40, 2.5, 0.5, 4, 30, 'sawtooth'); },
+  pain_g: (a, o) => vibrato(a, o, 900, 700, 0.2, 0.15, 12, 50),
+  pain_s: (a, o) => a.osc('square', 400, 250, 0.12, 0.2, o),
+  pain_m: (a, o) => a.osc('sawtooth', 130, 80, 0.25, 0.3, o),
+  pain_G: (a, o) => vibrato(a, o, 160, 120, 0.4, 0.3, 6, 10, 'sawtooth'),
+  claw: (a, o) => { a.noise(0.25, 0.7, o, { type: 'bandpass', f0: 1200, f1: 300, q: 2 }); a.osc('sawtooth', 100, 50, 0.25, 0.35, o); },
+  door: (a, o) => { vibrato(a, o, 300, 180, 0.8, 0.12, 14, 40, 'sawtooth'); a.noise(0.6, 0.35, o, { type: 'bandpass', f0: 250, f1: 500, q: 3 }); },
+  heart: (a, o) => { a.osc('sine', 70, 40, 0.16, 0.9, o); a.osc('sine', 62, 36, 0.16, 0.7, o, 0.2); },
+  step: (a, o) => a.noise(0.06, 0.08, o, { type: 'bandpass', f0: 600, f1: 300, q: 2 }),
+  step_dirt: (a, o) => a.noise(0.09, 0.09, o, { type: 'lowpass', f0: 900, f1: 200 }),
+  step_flagstone: (a, o) => { a.noise(0.05, 0.1, o, { type: 'bandpass', f0: 1800, f1: 900, q: 3 }); },
+  step_woodFloor: (a, o) => { a.noise(0.08, 0.1, o, { type: 'bandpass', f0: 500, f1: 250, q: 2 }); if (Math.random() < 0.15) vibrato(a, o, 420, 380, 0.4, 0.05, 18, 30, 'sawtooth'); },
+  stinger: (a, o) => { for (const f of [233, 247, 262, 277, 466]) a.osc('sawtooth', f, f * 0.97, 1.4, 0.16, o, 0, 0.005); a.noise(0.5, 1.0, o, { f0: 8000, f1: 400 }); },
+  whisper: (a, o) => { for (let i = 0; i < 5; i++) a.noise(0.35, 0.25, o, { type: 'bandpass', f0: 2500 + Math.random() * 2000, f1: 1500, q: 8, t: i * 0.3 }); },
+  owl: (a, o) => { a.osc('sine', 420, 380, 0.35, 0.12, o, 0, 0.05); a.osc('sine', 400, 360, 0.5, 0.1, o, 0.5, 0.05); },
+  crow: (a, o) => { for (let i = 0; i < 2; i++) a.noise(0.2, 0.35, o, { type: 'bandpass', f0: 1300, f1: 900, q: 5, t: i * 0.3 }); },
+  drip: (a, o) => a.osc('sine', 1600 + Math.random() * 800, 600, 0.12, 0.15, o),
+  creak: (a, o) => vibrato(a, o, 260 + Math.random() * 80, 200, 0.9, 0.08, 16, 40, 'sawtooth'),
+  scream: (a, o) => vibrato(a, o, 900, 1300, 1.2, 0.08, 7, 80, 'sawtooth'),
+  chains: (a, o) => { for (let i = 0; i < 6; i++) a.osc('triangle', 2400 + Math.random() * 1500, 2000, 0.06, 0.06, o, i * 0.07); },
+});
+const AMBIENT_EVENTS = {
+  outdoor: ['owl', 'crow', 'creak', 'scream', 'whisper'],
+  indoor: ['drip', 'creak', 'chains', 'whisper', 'scream', 'drip'],
 };
 
 export const audio = new Audio();

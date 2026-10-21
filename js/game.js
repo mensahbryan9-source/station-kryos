@@ -5,15 +5,26 @@ import { CONFIG } from './config.js';
 import { levelManifest } from './scoring.js';
 
 export const WEAPONS = [
-  { id: 'blade', name: 'Lame à arc', ammo: null, dmg: [28, 42], rate: 0.42, melee: true, auto: true, sound: 'blade', key: '1' },
-  { id: 'pistol', name: 'Pistolet à impulsion', ammo: 'cells', cost: 1, dmg: [14, 22], rate: 0.3, spread: 0.012, sound: 'pistol', key: '2' },
-  { id: 'rifle', name: 'Fusil plasma', ammo: 'cells', cost: 1, dmg: [12, 19], rate: 0.095, spread: 0.035, auto: true, sound: 'rifle', key: '3' },
-  { id: 'scatter', name: 'Fusil à dispersion', ammo: 'shells', cost: 1, dmg: [9, 15], pellets: 8, rate: 0.72, spread: 0.12, sound: 'scatter', key: '4' },
-  { id: 'arc', name: 'Canon à arc', ammo: 'cells', cost: 5, dmg: [95, 130], rate: 0.85, pierce: true, sound: 'arc', key: '5' },
+  { id: 'blade', name: 'Machette', ammo: null, dmg: [28, 42], rate: 0.42, melee: true, auto: true, sound: 'blade', key: '1' },
+  { id: 'pistol', name: 'Revolver', ammo: 'cells', cost: 1, dmg: [14, 22], rate: 0.3, spread: 0.012, sound: 'pistol', key: '2' },
+  { id: 'rifle', name: 'Carabine', ammo: 'cells', cost: 1, dmg: [12, 19], rate: 0.095, spread: 0.035, auto: true, sound: 'rifle', key: '3' },
+  { id: 'scatter', name: 'Fusil à double canon', ammo: 'shells', cost: 1, dmg: [9, 15], pellets: 8, rate: 0.72, spread: 0.12, sound: 'scatter', key: '4' },
+  { id: 'arc', name: 'Lance-flammes', ammo: 'cells', cost: 5, dmg: [95, 130], rate: 0.85, pierce: true, sound: 'arc', key: '5' },
 ];
+export const AMMO_NAMES = { cells: 'Balles', shells: 'Cartouches' };
 export const MAX_AMMO = { cells: 200, shells: 50 };
 
+// Bestiaire Halloween (les points affichés viennent de CONFIG.scoring.enemy).
 const ENEMY = {
+  g: { name: 'Fantôme', hp: 30, speed: 1.5, r: 0.3, sight: 14, range: 12, cd: [1.7, 2.8], pain: 0.7, kind: 'proj', proj: 'ecto', pdmg: [6, 11], pspeed: 5.2, ghost: true },
+  s: { name: 'Citrouille', hp: 55, speed: 1.3, r: 0.3, sight: 16, range: 13, cd: [1.5, 2.5], pain: 0.5, kind: 'proj', proj: 'seed', pdmg: [6, 12], pspeed: 6.5, drop: 'a' },
+  m: { name: 'Zombie', hp: 150, speed: 2.0, r: 0.36, sight: 12, range: 1.15, cd: [0.9, 1.2], pain: 0.25, kind: 'melee', dmg: [14, 24] },
+  G: { name: 'Le Gardien de la crypte', hp: 900, speed: 1.0, r: 0.65, sight: 26, range: 20, cd: [1.6, 2.4], pain: 0.06, kind: 'boss', proj: 'skullfire', pdmg: [10, 16], pspeed: 4.8, scale: 1.7, summon: 'g' },
+  O: { name: 'Le Roi Citrouille', hp: 2200, speed: 1.1, r: 0.75, sight: 30, range: 22, cd: [1.3, 2.1], pain: 0.04, kind: 'boss', proj: 'fireball', pdmg: [14, 22], pspeed: 5.4, scale: 1.9, summon: 'g' },
+};
+for (const k in ENEMY) ENEMY[k].points = CONFIG.scoring.enemy[k] || 0;
+// Ancien bestiaire de la station (conservé, inutilisé depuis le thème Halloween).
+export const ENEMY_STATION = {
   g: { name: 'Drone', hp: 30, speed: 1.7, r: 0.3, sight: 14, range: 12, cd: [1.7, 2.8], points: 100, pain: 0.7, kind: 'proj', proj: 'plasma', pdmg: [6, 11], pspeed: 5.5 },
   s: { name: 'Sentinelle', hp: 55, speed: 1.35, r: 0.3, sight: 16, range: 13, cd: [1.5, 2.5], points: 200, pain: 0.5, kind: 'hitscan', dmg: [4, 9], shots: 2, drop: 'a' },
   m: { name: 'Broyeur', hp: 150, speed: 2.7, r: 0.38, sight: 12, range: 1.15, cd: [0.8, 1.1], points: 400, pain: 0.25, kind: 'melee', dmg: [14, 24] },
@@ -24,6 +35,8 @@ export const DIFFICULTY = CONFIG.difficulties.map((d) => ({
   name: d.name, dmg: d.enemyDmg, hp: d.enemyHp, cd: d.enemyCooldown, speed: d.enemySpeed, battery: d.battery, tier: d.spawnTier,
 }));
 
+const BIG_PROJ = ['orb', 'fireball', 'skullfire'];
+const STEP_SOUNDS = { step_dirt: 1, step_flagstone: 1, step_woodFloor: 1 };
 const rnd = (a, b) => a + Math.random() * (b - a);
 const angDiff = (a, b) => { let d = a - b; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI; return d; };
 
@@ -38,12 +51,13 @@ export function newPlayerState(loadout) {
 
 export class Game {
   constructor({ level, levelIndex, assets, inventory, difficulty, ui }) {
-    this.level = level; this.levelIndex = levelIndex;
+    this.level = { ...level, scares: (level.scares || []).map((s) => ({ ...s })) };
+    this.levelIndex = levelIndex;
     this.assets = assets; this.ui = ui;
     this.diff = DIFFICULTY[difficulty];
     this.texList = assets.texList;
     const ti = assets.texIndex;
-    this.floorTex = ti[level.floor]; this.ceilTex = ti[level.ceiling]; this.doorSideTex = ti.doorSide;
+    this.floorTex = ti[level.floor]; this.ceilTex = ti[level.ceiling]; this.doorSideTex = ti[level.doorSide || 'doorSide'];
     const world = (this.world = new World(level, ti));
     world.onDoorSound = (d) => audio.play('door', { x: d.x + 0.5, y: d.y + 0.5 }, 0.7);
     this.flash = 0;
@@ -80,7 +94,7 @@ export class Game {
         this.decor.push({ t: c, x: s.x, y: s.y, spr: assets.sprites.decor[c], hp: c === 'o' ? 20 : Infinity });
       }
     }
-    this.boss = this.enemies.find((e) => e.t === 'O');
+    this.boss = this.enemies.find((e) => e.d.kind === 'boss');
   }
 
   get weapon() { return WEAPONS[this.player.cur]; }
@@ -98,9 +112,10 @@ export class Game {
       const n = Math.sin(t * 13.1) * Math.sin(t * 7.3 + 1.7) * Math.sin(t * 2.3 + 0.4);
       if (n > 0.45) flick = 1 - lv.flicker * Math.min(1, (n - 0.45) / 0.3);
     }
-    const ambient = (lv.ambient ?? lv.light ?? 1) * flick + this.flash * 0.45;
+    const dark = this.lightsOut > 0 ? (this.lightsOut > 0.6 ? 0.06 : 1 - this.lightsOut / 0.6 * 0.94) : 1;
+    const ambient = (lv.ambient ?? lv.light ?? 1) * flick * dark + this.flash * 0.45;
     let flash = 0;
-    if (p.lamp && p.battery > 0 && !p.dead) {
+    if (p.lamp && p.battery > 0 && !p.dead && !(this.lightsOut > 0.6 && Math.sin(t * 23) > -0.7)) {
       const L = CONFIG.lamp;
       flash = (lv.lampPower ?? (lv.ambient != null ? L.power : 0));
       if (p.battery < L.lowWarn) {
@@ -128,9 +143,59 @@ export class Game {
     for (const e of this.enemies) this.updateEnemy(e, dt);
     this.separateEnemies();
     this.updateProjectiles(dt);
-    for (const f of this.effects) f.t += dt;
+    for (const f of this.effects) {
+      f.t += dt;
+      if (f.vx) { f.x += f.vx * dt; f.y += f.vy * dt; }
+    }
     this.effects = this.effects.filter((f) => f.t < f.life);
+    if (!p.dead) { this.updateHeart(dt); this.updateScares(); }
+    this.lightsOut = Math.max(0, (this.lightsOut || 0) - dt);
     audio.listener = { x: p.x, y: p.y, a: p.a };
+  }
+
+  // Battements de cœur quand une menace approche (le moniteur du HUD suit le même rythme).
+  updateHeart(dt) {
+    const p = this.player;
+    let near = Infinity;
+    for (const e of this.enemies) {
+      if (e.state === 'dead' || e.state === 'dying') continue;
+      if (e.state === 'idle' && !e.sees) continue;
+      const d = Math.hypot(e.x - p.x, e.y - p.y);
+      if (d < near) near = d;
+    }
+    this.fear = Math.max(0, Math.min(1, 1 - (near - 1.5) / 8));
+    if (this.fear <= 0) { this.heartT = 0; return; }
+    this.heartT = (this.heartT || 0) - dt;
+    if (this.heartT <= 0) {
+      this.heartT = 1.15 - this.fear * 0.65;
+      audio.play('heart', null, 0.25 + this.fear * 0.75);
+    }
+  }
+
+  // Jump scares scriptés : une seule fois par case et par partie de niveau.
+  updateScares() {
+    const p = this.player, cx = Math.floor(p.x), cy = Math.floor(p.y);
+    for (const sc of this.level.scares || []) {
+      if (sc.done || sc.x !== cx || sc.y !== cy) continue;
+      sc.done = true;
+      this.scare(sc.kind);
+    }
+  }
+
+  scare(kind) {
+    const p = this.player;
+    if (kind === 'ghost') {
+      // un spectre surgit devant le joueur et le traverse
+      const ax = Math.cos(p.a), ay = Math.sin(p.a);
+      this.effects.push({ kind: 'rush', x: p.x + ax * 5, y: p.y + ay * 5, vx: -ax * 9, vy: -ay * 9, t: 0, life: 0.6, z: 0.05, scale: 1.1 });
+      audio.play('stinger'); audio.play('alert_g', null, 1);
+    } else if (kind === 'lights') {
+      this.lightsOut = 3.2;
+      audio.play('whisper'); setTimeout(() => audio.play('stinger'), 2600);
+    } else if (kind === 'face') {
+      audio.play('stinger');
+    }
+    this.ui.scare(kind);
   }
 
   actorInCell(x, y) {
@@ -160,7 +225,7 @@ export class Game {
     p.bob += moved * 3.2;
     p.bobY = Math.sin(p.bob * 2) * 0.006 * Math.min(1, p.moving);
     p.stepAcc += moved;
-    if (p.stepAcc > 1.1) { p.stepAcc = 0; audio.play('step', null, 0.6); }
+    if (p.stepAcc > 1.1) { p.stepAcc = 0; audio.play('step_' + this.level.floor in STEP_SOUNDS ? 'step_' + this.level.floor : 'step', null, 0.6); }
 
     p.cooldown -= dt; p.fireAnim = Math.max(0, p.fireAnim - dt); p.switchAnim = Math.max(0, p.switchAnim - dt);
     if (input.weapon != null) this.selectWeapon(input.weapon);
@@ -256,7 +321,7 @@ export class Game {
       else this.damageBarrel(h.barrel, dmg);
     }
     if (wp.pierce) {
-      for (let s = 0.6; s < wallD; s += 0.9) this.effect('arc0', p.x + dx * s, p.y + dy * s, 0.25, 0.4);
+      for (let s = 0.6; s < wallD; s += 0.9) this.effect(this.assets.sprites.misc.flame ? 'flame' : 'arc0', p.x + dx * s, p.y + dy * s, 0.25, 0.4);
     }
     if (!targets.length || wp.pierce) {
       const d = wallD - 0.06;
@@ -280,7 +345,7 @@ export class Game {
     if (e.state !== 'idle') return;
     e.state = 'chase'; e.react = rnd(0.5, 1.1) * this.diff.cd;
     audio.play('alert_' + e.t, e);
-    if (e.t === 'O') this.ui.message("L'ARCHONTE S'ÉVEILLE", 'boss');
+    if (e.d.kind === 'boss') this.ui.message(`${e.d.name.toUpperCase()} S'ÉVEILLE`, 'boss');
   }
 
   damageEnemy(e, dmg) {
@@ -292,11 +357,10 @@ export class Game {
       this.stats.kills++; this.player.score += e.d.points;
       if (e.id != null) this.stats.killIds.push(e.id);
       audio.play('die_' + e.t, e);
-      if (e.t === 'g') this.effect('boom', e.x, e.y, 0.5, 0.2);
-      if (e.t === 'O') {
+      if (e.d.kind === 'boss') {
         for (let i = 0; i < 6; i++) setTimeout(() => this.effect('boom', e.x + rnd(-1, 1), e.y + rnd(-1, 1), 0.6, rnd(0, 0.8), 1.6), i * 180);
-        this.world.tex[this.exitIndex()] = this.assets.texIndex.exitOn;
-        this.ui.message("ARCHONTE DÉTRUIT — L'ARRÊT D'URGENCE EST DÉVERROUILLÉ", 'boss');
+        this.world.tex[this.exitIndex()] = this.assets.texIndex[this.level.exitOn || 'exitOn'];
+        this.ui.message(`${e.d.name.toUpperCase()} EST VAINCU — LA SORTIE EST DÉVERROUILLÉE`, 'boss');
         // les drones invoqués s'effondrent avec leur maître
         for (const o of this.enemies) if (o.summoned && o.state !== 'dead' && o.state !== 'dying') { o.hp = 0; o.state = 'dying'; o.timer = 0; }
       }
@@ -366,7 +430,7 @@ export class Game {
       const d = w.door(tx, ty);
       if (d.lock && !p.keys[d.lock]) {
         audio.play('locked');
-        this.ui.message(d.lock === 'blue' ? 'Carte d\'accès BLEUE requise' : 'Carte d\'accès ROUGE requise', d.lock);
+        this.ui.message(d.lock === 'blue' ? 'Il faut la clé BLEUE' : 'Il faut la clé ROUGE', d.lock);
         return;
       }
       if (w.openDoor(d)) audio.play('door', { x: tx + 0.5, y: ty + 0.5 });
@@ -382,10 +446,10 @@ export class Game {
       }
     } else if (t === EXIT) {
       if (this.level.requireBoss && this.boss && this.boss.state !== 'dead' && this.boss.state !== 'dying') {
-        audio.play('locked'); this.ui.message("Verrouillé par l'Archonte. Détruisez-le !", 'red');
+        audio.play('locked'); this.ui.message(`Scellé par ${this.boss.d.name.toLowerCase()}. Terrassez-le !`, 'red');
         return;
       }
-      w.tex[w.idx(tx, ty)] = this.assets.texIndex.exitOn;
+      w.tex[w.idx(tx, ty)] = this.assets.texIndex[this.level.exitOn || 'exitOn'];
       audio.play('exit');
       this.over = true;
       this.player.score += Math.max(0, 1000 - Math.floor(this.time) * 5);
@@ -429,14 +493,14 @@ export class Game {
       audio.play('weapon'); ui.flash('pick'); return true;
     };
     switch (t) {
-      case 'h': if (p.health >= 100) return false; p.health = Math.min(100, p.health + 15); ui.message('Trousse de soin +15'); audio.play('health'); ui.flash('pick'); return true;
-      case 'H': if (p.health >= 100) return false; p.health = Math.min(100, p.health + 40); ui.message('Médikit +40'); audio.play('health'); ui.flash('pick'); return true;
-      case 'r': if (p.armor >= 100) return false; p.armor = Math.min(100, p.armor + 50); ui.message('Plastron composite +50'); audio.play('armor'); ui.flash('pick'); return true;
-      case 'a': return ammo('cells', 20, 'Cellules d\'énergie +20');
+      case 'h': if (p.health >= 100) return false; p.health = Math.min(100, p.health + 15); ui.message('Bonbon +15'); audio.play('health'); ui.flash('pick'); return true;
+      case 'H': if (p.health >= 100) return false; p.health = Math.min(100, p.health + 40); ui.message('Potion de soin +40'); audio.play('health'); ui.flash('pick'); return true;
+      case 'r': if (p.armor >= 100) return false; p.armor = Math.min(100, p.armor + 50); ui.message('Gilet de cuir clouté +50'); audio.play('armor'); ui.flash('pick'); return true;
+      case 'a': return ammo('cells', 20, 'Balles +20');
       case 'c': return ammo('shells', 8, 'Cartouches +8');
-      case 'k': p.keys.blue = true; ui.message('Carte d\'accès BLEUE', 'blue'); audio.play('key'); ui.flash('pick'); return true;
-      case 'K': p.keys.red = true; ui.message('Carte d\'accès ROUGE', 'red'); audio.play('key'); ui.flash('pick'); return true;
-      case 't': p.score += 500; this.stats.items++; ui.message('Cristal de données +500'); audio.play('treasure'); ui.flash('pick'); return true;
+      case 'k': p.keys.blue = true; ui.message('Clé BLEUE', 'blue'); audio.play('key'); ui.flash('pick'); return true;
+      case 'K': p.keys.red = true; ui.message('Clé ROUGE', 'red'); audio.play('key'); ui.flash('pick'); return true;
+      case 't': p.score += 500; this.stats.items++; ui.message('Crâne d\'or +500'); audio.play('treasure'); ui.flash('pick'); return true;
       case 'b': if (p.battery >= 100) return false; p.battery = Math.min(100, p.battery + CONFIG.lamp.pickup); ui.message(`Piles +${CONFIG.lamp.pickup} %`); audio.play('pickup'); ui.flash('pick'); return true;
       case 'w': return weapon(2, 'cells', 30);
       case 'W': return weapon(3, 'shells', 12);
@@ -529,14 +593,15 @@ export class Game {
   }
 
   summonDrone(boss) {
+    const t = boss.d.summon || 'g';
     for (let i = 0; i < 2; i++) {
       const a = Math.random() * 6.28, x = boss.x + Math.cos(a) * 1.4, y = boss.y + Math.sin(a) * 1.4;
       if (this.world.collides(x, y, 0.3)) continue;
-      const d = ENEMY.g;
-      this.enemies.push({ t: 'g', d, x, y, a, hp: d.hp * this.diff.hp, state: 'chase', timer: 0, anim: 0, cd: 1.5, react: 0.5, summon: 0, spr: this.assets.sprites.enemy.g, summoned: true });
-      this.effect('arc0', x, y, 0.5, 0.3, 1.5);
+      const d = ENEMY[t];
+      this.enemies.push({ t, d, x, y, a, hp: d.hp * this.diff.hp, state: 'chase', timer: 0, anim: 0, cd: 1.5, react: 0.5, summon: 0, spr: this.assets.sprites.enemy[t], summoned: true });
+      this.effect('puff', x, y, 0.5, 0.3, 2);
     }
-    audio.play('alert_g', boss);
+    audio.play('alert_' + t, boss);
   }
 
   enemyAttack(e, dist) {
@@ -558,9 +623,9 @@ export class Game {
       }
     } else if (d.kind === 'proj') {
       this.spawnProj(e, a, d);
-      audio.play('plasma', e);
+      audio.play(d.proj === 'plasma' ? 'plasma' : d.proj, e);
     } else if (d.kind === 'boss') {
-      audio.play('orb', e);
+      audio.play(d.proj, e);
       const pattern = Math.random();
       if (pattern < 0.65) for (let i = -2; i <= 2; i++) this.spawnProj(e, a + i * 0.16, d);
       else for (let i = 0; i < 12; i++) this.spawnProj(e, (i / 12) * Math.PI * 2, d, 0.8);
@@ -571,7 +636,7 @@ export class Game {
     this.projectiles.push({
       x: e.x + Math.cos(a) * (e.d.r + 0.1), y: e.y + Math.sin(a) * (e.d.r + 0.1),
       dx: Math.cos(a), dy: Math.sin(a), speed: d.pspeed * speedMul, dmg: rnd(...d.pdmg), kind: d.proj,
-      z: d.proj === 'orb' ? 0.25 : 0.3, life: 6,
+      z: BIG_PROJ.includes(d.proj) ? 0.25 : 0.3, life: 6,
     });
   }
 
@@ -622,12 +687,13 @@ export class Game {
       else spr = f.walk[e.t === 'g' || e.t === 'O' ? Math.floor(e.anim * 2) & 1 : 0];
       out.push({ x: e.x, y: e.y, spr, scale: e.d.scale || 1, hurt: e.hurtT > 0 && e.state !== 'dead', ghost: e.d.ghost && e.state !== 'dead' ? 1 : 0 });
     }
-    for (const pr of this.projectiles) out.push({ x: pr.x, y: pr.y, spr: S.misc[pr.kind], z: pr.z - 0.2, scale: pr.kind === 'orb' ? 0.9 : 0.6, bright: true });
+    for (const pr of this.projectiles) out.push({ x: pr.x, y: pr.y, spr: S.misc[pr.kind], z: pr.z - 0.2, scale: BIG_PROJ.includes(pr.kind) ? 0.9 : 0.6, bright: true });
     for (const f of this.effects) {
       let spr;
       const k = f.t / f.life;
       if (f.kind === 'puff') spr = S.misc[k < 0.5 ? 'puff0' : 'puff1'];
       else if (f.kind === 'boom') spr = S.misc['boom' + Math.min(2, Math.floor(k * 3))];
+      else if (f.kind === 'rush') { out.push({ x: f.x, y: f.y, spr: S.enemy.g.attack, z: f.z, scale: f.scale, ghost: 1 }); continue; }
       else spr = S.misc[f.kind];
       out.push({ x: f.x, y: f.y, spr, z: f.z - (f.kind === 'boom' ? 0 : 0.25), scale: (f.kind === 'puff' ? 0.5 : 1) * f.scale, bright: true });
     }

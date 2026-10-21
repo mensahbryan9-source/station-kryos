@@ -2,7 +2,7 @@
 import { WALL_CHARS } from './levels.js';
 
 export const EMPTY = 0, WALL = 1, DOOR = 2, PUSH = 3, EXIT = 4, MOVING = 5;
-const SOLID_DECOR = 'oynq';
+const SOLID_DECOR = 'oynqu';
 const DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1]];
 
 export class World {
@@ -27,7 +27,7 @@ export class World {
 
     for (let y = 0; y < this.H; y++) for (let x = 0; x < this.W; x++) {
       const c = m[y][x], i = y * this.W + x;
-      if (c === 'X') { this.type[i] = EXIT; this.tex[i] = texIndex.exitOff; }
+      if (c === 'X') { this.type[i] = EXIT; this.tex[i] = texIndex[def.exitOff || 'exitOff']; }
       else if (c in WALL_CHARS) {
         this.type[i] = WALL;
         const v = def.variants && def.variants[c];
@@ -38,7 +38,8 @@ export class World {
         this.secretIds.set(i, this.totalSecrets++);
       } else if (c === 'D' || c === 'B' || c === 'R') {
         this.type[i] = DOOR;
-        this.tex[i] = texIndex[c === 'B' ? 'doorBlue' : c === 'R' ? 'doorRed' : 'door'];
+        const names = def.doors || ['door', 'doorBlue', 'doorRed'];
+        this.tex[i] = texIndex[names[c === 'B' ? 1 : c === 'R' ? 2 : 0]];
       } else {
         if (c === 'P') this.start = { x: x + 0.5, y: y + 0.5 };
         else if (c !== '.' && c !== ' ') this.spawns.push({ ch: c, x: x + 0.5, y: y + 0.5 });

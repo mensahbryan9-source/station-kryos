@@ -43,11 +43,13 @@ export const CONFIG = {
   // Par niveau (même ordre que LEVELS) : temps de référence et temps minimum
   // plausible, en secondes de jeu.
   levels: [
-    { id: 'cimetiere', par: 210, minTime: 40 },
-    { id: 'catacombes', par: 270, minTime: 50 },
-    { id: 'crypte', par: 300, minTime: 55 },
-    { id: 'jardins', par: 300, minTime: 55 },
-    { id: 'manoir', par: 360, minTime: 70 },
+    // par ≈ chemin + 4 s par ennemi (Normal) + 30 s, boss compris ; minTime = temps
+    // d'un parcours parfait en courant (vérifié par tools/validate-levels.mjs).
+    { id: 'cimetiere', par: 150, minTime: 8 },
+    { id: 'catacombes', par: 210, minTime: 12 },
+    { id: 'crypte', par: 230, minTime: 12 },
+    { id: 'jardins', par: 170, minTime: 7 },
+    { id: 'manoir', par: 290, minTime: 16 },
   ],
 
   antiCheat: {

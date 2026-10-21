@@ -80,7 +80,7 @@ export function validateLevel(level, levelIndex, difficulty, ev, ctx = {}) {
   if (!kills.every((id) => present.has(id))) return { ok: false, reason: 'ennemi absent du niveau' };
   if (new Set(secrets).size !== secrets.length || secrets.some((s) => s < 0 || s >= manifest.secrets)) return { ok: false, reason: 'secrets incohérents' };
   if (level.requireBoss) {
-    const boss = manifest.present.find((e) => e.type === 'O');
+    const boss = manifest.present.find((e) => e.type === 'O' || e.type === 'G');
     if (boss && !kills.includes(boss.id)) return { ok: false, reason: 'sortie sans avoir vaincu le boss' };
   }
 

@@ -3,14 +3,14 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-  <title>Station Kryos</title>
-  <meta name="description" content="Station Kryos — FPS rétro en raycasting. Infiltrez une station minière corrompue et détruisez l'Archonte.">
-  <meta name="theme-color" content="#05080d">
+  <title>Le Manoir des Ombres</title>
+  <meta name="description" content="Le Manoir des Ombres — FPS d'Halloween en raycasting. Jeu-concours de la Soirée Halloween du BDE Epitech Bénin.">
+  <meta name="theme-color" content="#07040a">
   <meta name="color-scheme" content="dark">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="Kryos">
+  <meta name="apple-mobile-web-app-title" content="Manoir">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
   <link rel="icon" href="icons/icon-192.png" sizes="192x192" type="image/png">
@@ -26,7 +26,8 @@
   <div id="crosshair"></div>
   <canvas id="minimap" width="160" height="160"></canvas>
   <div id="messages" aria-live="polite"></div>
-  <div id="bossbar" hidden><span>L'ARCHONTE</span><div><i></i></div></div>
+  <div id="bossbar" hidden><span></span><div><i></i></div></div>
+  <div id="scare"><canvas width="640" height="480"></canvas></div>
 
   <div id="hud" hidden>
     <div class="cell"><label>SANTÉ</label><b id="h-health">100</b></div>
@@ -36,7 +37,7 @@
     <div class="cell lampcell"><label>LAMPE <kbd>F</kbd></label><span class="bat"><i id="h-bat"></i></span></div>
     <div class="cell keys"><label>CARTES</label><span><i id="k-blue"></i><i id="k-red"></i></span></div>
     <div class="cell"><label>SCORE</label><b id="h-score">0</b></div>
-    <div class="cell"><label>SECTEUR</label><b id="h-level">1</b></div>
+    <div class="cell"><label>NIVEAU</label><b id="h-level">1</b></div>
   </div>
 
   <div id="touch" hidden>
@@ -55,12 +56,13 @@
   <!-- Écrans -->
   <section class="screen" id="s-title">
     <div class="logo">
-      <small>UNE MISSION EN 3 SECTEURS</small>
-      <h1>STATION<br><span>KRYOS</span></h1>
+      <small>CINQ NIVEAUX · UNE SEULE NUIT</small>
+      <h1>LE MANOIR<br><span>DES OMBRES</span></h1>
+      <p class="event">🎃 Jeu-concours de la <b>Soirée Halloween du BDE Epitech Bénin</b> — samedi 31 octobre</p>
     </div>
     <nav>
       <button data-go="difficulty" class="primary">Nouvelle partie</button>
-      <button data-go="levels">Choisir un secteur</button>
+      <button data-go="levels">Choisir un niveau</button>
       <button data-go="options">Options</button>
       <button data-go="help">Commandes</button>
       <button id="install" hidden>Installer l'application</button>
@@ -80,7 +82,7 @@
   </section>
 
   <section class="screen" id="s-levels" hidden>
-    <h2>Secteurs</h2>
+    <h2>Niveaux</h2>
     <nav id="level-list"></nav>
     <nav><button data-go="title" class="back">Retour</button></nav>
   </section>
@@ -103,6 +105,7 @@
       </label>
       <label class="check"><input type="checkbox" id="o-minimap"> Mini-carte</label>
       <label class="check"><input type="checkbox" id="o-touch"> Commandes tactiles</label>
+      <label class="check"><input type="checkbox" id="o-scares"> Effets de frayeur (jump scares)</label>
     </form>
     <nav><button data-back class="back">Retour</button></nav>
   </section>
@@ -134,7 +137,7 @@
         <ul><li>Sticks — bouger / viser · <b>RT</b> tirer · <b>A</b> utiliser · <b>Y</b> lampe · <b>LB/RB</b> armes · <b>Start</b> pause</li></ul>
       </div>
     </div>
-    <p class="tip">Astuce : certains murs sonnent creux… Poussez-les.</p>
+    <p class="tip">Astuce : certains murs sonnent creux… Poussez-les. Et ménagez votre lampe.</p>
     <nav><button data-back class="back">Retour</button></nav>
   </section>
 
@@ -142,7 +145,7 @@
     <small id="b-sub"></small>
     <h2 id="b-name"></h2>
     <p id="b-text" class="brief"></p>
-    <nav><button id="b-go" class="primary">Entrer dans le secteur</button></nav>
+    <nav><button id="b-go" class="primary">Entrer</button></nav>
   </section>
 
   <section class="screen" id="s-pause" hidden>
@@ -151,17 +154,17 @@
       <button id="p-resume" class="primary">Reprendre</button>
       <button data-go="options">Options</button>
       <button data-go="help">Commandes</button>
-      <button id="p-restart">Recommencer le secteur</button>
+      <button id="p-restart">Recommencer le niveau</button>
       <button id="p-quit">Menu principal</button>
     </nav>
   </section>
 
   <section class="screen" id="s-inter" hidden>
-    <small>SECTEUR TERMINÉ</small>
+    <small>NIVEAU TERMINÉ</small>
     <h2 id="i-name"></h2>
     <table class="stats">
       <tr><td>Hostiles neutralisés</td><td id="i-kills"></td></tr>
-      <tr><td>Cristaux récupérés</td><td id="i-items"></td></tr>
+      <tr><td>Crânes d'or récupérés</td><td id="i-items"></td></tr>
       <tr><td>Secrets découverts</td><td id="i-secrets"></td></tr>
       <tr><td>Temps</td><td id="i-time"></td></tr>
       <tr><td>Score</td><td id="i-score"></td></tr>
@@ -170,18 +173,18 @@
   </section>
 
   <section class="screen" id="s-dead" hidden>
-    <h2 class="red">SIGNAL PERDU</h2>
-    <p>Vos constantes vitales sont à zéro.</p>
+    <h2 class="red">VOUS ÊTES MORT</h2>
+    <p>Le manoir compte un fantôme de plus.</p>
     <nav>
-      <button id="d-retry" class="primary">Réessayer le secteur</button>
+      <button id="d-retry" class="primary">Réessayer le niveau</button>
       <button id="d-quit">Menu principal</button>
     </nav>
   </section>
 
   <section class="screen" id="s-victory" hidden>
     <small>MISSION ACCOMPLIE</small>
-    <h2>KRYOS EST LIBÉRÉE</h2>
-    <p class="brief">L'Archonte n'est plus qu'un amas de circuits fondus. Les systèmes de la station redémarrent un à un pendant que votre navette se détache du quai. Dans le silence de l'espace, un dernier signal clignote sur votre console… mais c'est une autre histoire.</p>
+    <h2>L'AUBE SE LÈVE</h2>
+    <p class="brief">Le Roi Citrouille n'est plus qu'un tas d'écorces fumantes. Les portraits ferment les yeux, les bougies s'éteignent une à une, et le premier rayon de soleil traverse les vitraux. Vous avez survécu à la nuit… Rendez-vous le 31 octobre à la soirée Halloween du BDE Epitech Bénin !</p>
     <table class="stats">
       <tr><td>Score final</td><td id="v-score"></td></tr>
       <tr><td>Temps total</td><td id="v-time"></td></tr>
