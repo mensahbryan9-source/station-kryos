@@ -1,5 +1,5 @@
 // Service worker : met tout le jeu en cache pour un fonctionnement hors connexion.
-const VERSION = 'manoir-v3';
+const VERSION = 'manoir-v4';
 const FILES = [
   './', 'index.html', 'manifest.webmanifest', 'css/style.css',
   'js/main.js', 'js/game.js', 'js/world.js', 'js/renderer.js', 'js/textures.js',

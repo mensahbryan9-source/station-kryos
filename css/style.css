@@ -71,6 +71,7 @@ button, select, input { font: inherit; color: inherit; }
 #hud .bat i { display: block; height: 100%; background: #ffd27a; box-shadow: 0 0 8px #ffb02e; transition: width .3s; }
 #hud .bat i.low { background: var(--red); box-shadow: 0 0 8px var(--red); animation: blink 1s infinite; }
 #hud .bat i.off { opacity: .3; }
+#hud .bat i.charging { opacity: 1; background: #6ab8ff; box-shadow: 0 0 8px #3a8cff; animation: blink 1.2s infinite; }
 
 /* Tactile */
 #touch { position: absolute; inset: 0; }

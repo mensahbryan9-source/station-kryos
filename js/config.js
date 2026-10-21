@@ -71,9 +71,10 @@ export const CONFIG = {
 
   player: { maxHp: 100 },
 
-  // Lampe torche : autonomie en secondes à Normal (multipliée par `battery`
-  // de la difficulté), recharge d'une pile ramassée, seuil d'alerte en %.
-  lamp: { seconds: 200, pickup: 40, lowWarn: 20, power: 1.1 },
+  // Lampe torche : autonomie en secondes à Normal (multipliée par `battery` de la
+  // difficulté). Elle se recharge seule quand elle est éteinte (`rechargeSeconds`
+  // de 0 à 100 %) ; vidée, elle se coupe et se rallume dès `resumeAt` %.
+  lamp: { seconds: 90, rechargeSeconds: 12, resumeAt: 35, lowWarn: 20, power: 1.1 },
 };
 
 export const contestEnd = () => new Date(CONFIG.contest.end);

@@ -16,11 +16,11 @@ export const MAX_AMMO = { cells: 200, shells: 50 };
 
 // Bestiaire Halloween (les points affichés viennent de CONFIG.scoring.enemy).
 const ENEMY = {
-  g: { name: 'Fantôme', hp: 30, speed: 1.5, r: 0.3, sight: 14, range: 12, cd: [1.7, 2.8], pain: 0.7, kind: 'proj', proj: 'ecto', pdmg: [6, 11], pspeed: 5.2, ghost: true },
-  s: { name: 'Citrouille', hp: 55, speed: 1.3, r: 0.3, sight: 16, range: 13, cd: [1.5, 2.5], pain: 0.5, kind: 'proj', proj: 'seed', pdmg: [6, 12], pspeed: 6.5, drop: 'a' },
-  m: { name: 'Zombie', hp: 150, speed: 2.0, r: 0.36, sight: 12, range: 1.15, cd: [0.9, 1.2], pain: 0.25, kind: 'melee', dmg: [14, 24] },
-  G: { name: 'Le Gardien de la crypte', hp: 900, speed: 1.0, r: 0.65, sight: 26, range: 20, cd: [1.6, 2.4], pain: 0.06, kind: 'boss', proj: 'skullfire', pdmg: [10, 16], pspeed: 4.8, scale: 1.7, summon: 'g' },
-  O: { name: 'Le Roi Citrouille', hp: 2200, speed: 1.1, r: 0.75, sight: 30, range: 22, cd: [1.3, 2.1], pain: 0.04, kind: 'boss', proj: 'fireball', pdmg: [14, 22], pspeed: 5.4, scale: 1.9, summon: 'g' },
+  g: { name: 'Spectre', hp: 18, speed: 1.5, r: 0.3, sight: 14, range: 12, cd: [1.8, 3.0], pain: 0.8, kind: 'proj', proj: 'ecto', pdmg: [5, 9], pspeed: 5.0, ghost: true },
+  s: { name: 'Citrouille pourrie', hp: 32, speed: 1.3, r: 0.3, sight: 16, range: 13, cd: [1.7, 2.7], pain: 0.6, kind: 'proj', proj: 'seed', pdmg: [5, 9], pspeed: 6.0, drop: 'a' },
+  m: { name: 'Zombie', hp: 85, speed: 1.9, r: 0.36, sight: 12, range: 1.15, cd: [1.0, 1.3], pain: 0.35, kind: 'melee', dmg: [10, 18] },
+  G: { name: 'Le Gardien de la crypte', hp: 550, speed: 1.0, r: 0.65, sight: 26, range: 20, cd: [1.8, 2.6], pain: 0.08, kind: 'boss', proj: 'skullfire', pdmg: [8, 13], pspeed: 4.6, scale: 1.7, summon: 'g' },
+  O: { name: 'Le Roi Citrouille', hp: 1300, speed: 1.1, r: 0.75, sight: 30, range: 22, cd: [1.5, 2.3], pain: 0.05, kind: 'boss', proj: 'fireball', pdmg: [11, 17], pspeed: 5.2, scale: 1.9, summon: 'g' },
 };
 for (const k in ENEMY) ENEMY[k].points = CONFIG.scoring.enemy[k] || 0;
 // Ancien bestiaire de la station (conservé, inutilisé depuis le thème Halloween).
@@ -115,7 +115,7 @@ export class Game {
     const dark = this.lightsOut > 0 ? (this.lightsOut > 0.6 ? 0.06 : 1 - this.lightsOut / 0.6 * 0.94) : 1;
     const ambient = (lv.ambient ?? lv.light ?? 1) * flick * dark + this.flash * 0.45;
     let flash = 0;
-    if (p.lamp && p.battery > 0 && !p.dead && !(this.lightsOut > 0.6 && Math.sin(t * 23) > -0.7)) {
+    if (p.lamp && !p.recharging && p.battery > 0 && !p.dead && !(this.lightsOut > 0.6 && Math.sin(t * 23) > -0.7)) {
       const L = CONFIG.lamp;
       flash = (lv.lampPower ?? (lv.ambient != null ? L.power : 0));
       if (p.battery < L.lowWarn) {
@@ -232,11 +232,16 @@ export class Game {
     if (input.nextWeapon) this.cycleWeapon(input.nextWeapon);
     if (input.use) this.use();
     if (input.lamp) { p.lamp = !p.lamp; audio.play('click'); }
-    if (p.lamp && p.battery > 0) {
+    // Lampe : se vide allumée, se recharge seule éteinte ; vidée, elle se coupe le temps de remonter.
+    const LC = CONFIG.lamp;
+    if (p.lamp && !p.recharging) {
       const before = p.battery;
-      p.battery = Math.max(0, p.battery - (dt * 100) / (CONFIG.lamp.seconds * this.diff.battery));
-      if (before >= CONFIG.lamp.lowWarn && p.battery < CONFIG.lamp.lowWarn) this.ui.message('Batterie de la lampe faible', 'red');
-      if (before > 0 && p.battery === 0) this.ui.message('Lampe éteinte — trouvez des piles', 'red');
+      p.battery = Math.max(0, p.battery - (dt * 100) / (LC.seconds * this.diff.battery));
+      if (before >= LC.lowWarn && p.battery < LC.lowWarn) this.ui.message('Lampe faible — éteignez-la (F) pour la recharger', 'red');
+      if (p.battery === 0) { p.recharging = true; audio.play('click'); this.ui.message('Lampe déchargée — recharge en cours…', 'red'); }
+    } else if (p.battery < 100) {
+      p.battery = Math.min(100, p.battery + (dt * 100) / LC.rechargeSeconds);
+      if (p.recharging && p.battery >= LC.resumeAt) { p.recharging = false; if (p.lamp) { audio.play('click'); this.ui.message('Lampe rechargée'); } }
     }
     const wpn = this.weapon;
     if (input.fire && p.cooldown <= 0 && p.switchAnim <= 0 && (input.firePressed || wpn.auto)) this.fire();

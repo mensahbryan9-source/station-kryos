@@ -2,135 +2,191 @@
 // crypte, Roi Citrouille, objets, décor, projectiles et armes.
 import { sprite, ell, shadow, sparks, bright, enemyFrames, weaponCanvas, flash, body, lerp } from './sprites.js';
 
-// ——— Fantôme (g) : drap flottant, rendu semi-transparent ———
+// ——— Spectre (g) : linceul en lambeaux, visage décharné qui hurle (rendu translucide) ———
 function drawGhost(g, r, pose) {
   if (pose.startsWith('die')) {
     const k = +pose[3];
-    if (k === 2) { ell(g, 32, 60, 14, 3, 'rgba(90,255,150,.85)'); ell(g, 30, 59, 7, 1.5, '#d8ffe0'); return; }
-    g.globalAlpha = 1 - k * 0.3;
-    for (let i = 0; i < 18; i++) {
-      const a = (i / 18) * 6.28 + k, d = 6 + k * 10 + (i % 3) * 4;
-      ell(g, 32 + Math.cos(a) * d, 30 + Math.sin(a) * d * 0.7, 4 - k, 3 - k * 0.5, '#e8f4ff');
+    if (k === 2) { ell(g, 32, 60, 15, 3, 'rgba(20,30,40,.9)'); ell(g, 30, 59, 8, 1.5, '#5a7a88'); return; }
+    // le spectre se déchire en lambeaux
+    for (let i = 0; i < 14; i++) {
+      const a = (i / 14) * 6.28 + k * 0.7, d = 8 + k * 12 + (i % 3) * 5;
+      g.strokeStyle = `rgba(190,205,215,${0.8 - k * 0.3})`; g.lineWidth = 2;
+      g.beginPath(); g.moveTo(32 + Math.cos(a) * d * 0.4, 28 + Math.sin(a) * d * 0.3); g.lineTo(32 + Math.cos(a) * d, 28 + Math.sin(a) * d * 0.8); g.stroke();
     }
-    g.globalAlpha = 1;
+    ell(g, 32, 24 + k * 8, 7 - k * 2, 9 - k * 3, '#cfd8dc');
+    ell(g, 32, 28 + k * 8, 3, 5 - k, '#000');
     return;
   }
-  const wave = pose === 'walk1' ? 1 : 0;
-  const y0 = 8 + (pose === 'walk1' ? 2 : 0);
-  const grd = g.createLinearGradient(0, y0, 0, 56);
-  grd.addColorStop(0, '#e8f0ff'); grd.addColorStop(1, '#7f9cc8');
+  const sway = pose === 'walk1' ? 2 : 0;
+  // linceul en lambeaux
+  const grd = g.createLinearGradient(0, 8, 0, 62);
+  grd.addColorStop(0, '#9aa8b0'); grd.addColorStop(0.5, '#4a5660'); grd.addColorStop(1, 'rgba(20,26,32,.9)');
   g.fillStyle = grd;
-  g.beginPath();
-  g.moveTo(14, 54);
-  g.bezierCurveTo(10, 30, 16, y0, 32, y0);
-  g.bezierCurveTo(48, y0, 54, 30, 50, 54);
-  for (let i = 0; i < 6; i++) {
-    const x = 50 - (i + 1) * 6;
-    g.quadraticCurveTo(x + 3, 54 + ((i + wave) % 2 ? 7 : -1), x, 54);
+  g.beginPath(); g.moveTo(32, 4); g.bezierCurveTo(50, 6, 54, 30, 52, 48);
+  for (let i = 0; i < 7; i++) g.lineTo(52 - i * 6.6 + (i % 2 ? sway : -sway), i % 2 ? 62 : 50 + (i % 3) * 3);
+  g.bezierCurveTo(10, 30, 14, 6, 32, 4); g.fill();
+  // longs cheveux pendants
+  g.strokeStyle = '#0c0e10'; g.lineWidth = 1.2;
+  for (let i = 0; i < 9; i++) { const x = 20 + i * 3; g.beginPath(); g.moveTo(x, 8); g.quadraticCurveTo(x - 2 + sway, 26, x + (i % 2 ? 3 : -3), 44 + (i % 3) * 4); g.stroke(); }
+  // visage étiré, peau tendue sur l'os
+  const face = g.createRadialGradient(32, 20, 1, 32, 22, 12);
+  face.addColorStop(0, '#e8ecee'); face.addColorStop(1, '#8c989e');
+  g.fillStyle = face; g.beginPath(); g.ellipse(32, 22, 8, 13, 0, 0, 7); g.fill();
+  g.fillStyle = 'rgba(40,50,56,.6)'; g.fillRect(25, 25, 2, 6); g.fillRect(37, 25, 2, 6); // joues creuses
+  // orbites vides avec pupilles minuscules
+  const glow = pose === 'attack' ? '#ff2020' : '#e8f4ff';
+  for (const x of [28, 36]) { ell(g, x, 17, 3, 4, '#000'); g.fillStyle = glow; g.fillRect(x - 0.5, 17, 1.5, 1.5); }
+  // bouche béante qui hurle
+  const open = pose === 'attack' ? 11 : 7;
+  ell(g, 32, 29 + open / 3, 3.5, open, '#000');
+  g.fillStyle = '#c8c4b0'; g.fillRect(30, 26, 1, 2); g.fillRect(33, 26, 1, 2);
+  // bras décharnés et griffes
+  const reach = pose === 'attack' ? -10 : 0;
+  g.strokeStyle = '#7c8890'; g.lineWidth = 2.2;
+  for (const s of [-1, 1]) {
+    const sx = 32 + s * 12, ex = 32 + s * 26, ey = 34 + reach;
+    g.beginPath(); g.moveTo(sx, 30); g.quadraticCurveTo(32 + s * 20, 38, ex, ey); g.stroke();
+    g.lineWidth = 1;
+    for (let f = -1; f <= 1; f++) { g.beginPath(); g.moveTo(ex, ey); g.lineTo(ex + s * 5, ey + f * 4 - 3); g.stroke(); }
+    g.lineWidth = 2.2;
   }
-  g.fill();
-  // bras
-  const up = pose === 'attack' ? -12 : 0;
-  g.beginPath(); g.moveTo(16, 30); g.quadraticCurveTo(4, 30 + up, 6, 40 + up); g.lineTo(14, 38); g.fill();
-  g.beginPath(); g.moveTo(48, 30); g.quadraticCurveTo(60, 30 + up, 58, 40 + up); g.lineTo(50, 38); g.fill();
-  // visage
-  const eye = pose === 'attack' ? '#5dff8a' : '#0a0c14';
-  ell(g, 25, y0 + 14, 4, 6, eye); ell(g, 39, y0 + 14, 4, 6, eye);
-  ell(g, 32, y0 + 28, pose === 'attack' ? 6 : 4, pose === 'attack' ? 9 : 5, '#0a0c14');
-  if (pose === 'pain') { g.fillStyle = 'rgba(255,255,255,.5)'; g.fillRect(10, y0, 44, 50); }
+  if (pose === 'pain') { g.fillStyle = 'rgba(255,255,255,.45)'; g.fillRect(12, 4, 40, 56); }
 }
 
-// ——— Citrouille maléfique (s) : tête sculptée sur un corps de lianes ———
+// ——— Citrouille pourrie (s) : tête moisie à crocs sur un épouvantail de ronces ———
 function pumpkinHead(g, cx, cy, rx, ry, mouthOpen, lit = true) {
   const grd = g.createRadialGradient(cx - rx * 0.3, cy - ry * 0.3, 2, cx, cy, rx * 1.2);
-  grd.addColorStop(0, '#ffa040'); grd.addColorStop(0.6, '#e06a10'); grd.addColorStop(1, '#7a3006');
+  grd.addColorStop(0, '#b8581a'); grd.addColorStop(0.6, '#7a3008'); grd.addColorStop(1, '#2a0e04');
   g.fillStyle = grd;
   g.beginPath(); g.ellipse(cx, cy, rx, ry, 0, 0, 7); g.fill();
-  g.strokeStyle = 'rgba(120,50,6,.7)'; g.lineWidth = 1;
+  // pourriture et moisissure
+  for (const [dx, dy, s] of [[-0.6, -0.4, 0.22], [0.55, 0.3, 0.18], [-0.2, 0.6, 0.15], [0.4, -0.55, 0.12]]) {
+    ell(g, cx + dx * rx, cy + dy * ry, rx * s, ry * s * 0.8, 'rgba(40,50,20,.85)');
+    ell(g, cx + dx * rx + 1, cy + dy * ry, rx * s * 0.5, ry * s * 0.4, 'rgba(120,140,90,.6)');
+  }
+  g.strokeStyle = 'rgba(30,10,2,.8)'; g.lineWidth = 1;
   for (const k of [-0.55, 0, 0.55]) { g.beginPath(); g.ellipse(cx + k * rx * 0.6, cy, rx * 0.35, ry * 0.98, 0, 0, 7); g.stroke(); }
-  g.fillStyle = '#3a5a14'; g.fillRect(cx - 2, cy - ry - 5, 4, 7);
-  const fire = lit ? '#ffd040' : '#2a1006';
+  g.fillStyle = '#1a2208'; g.fillRect(cx - 2, cy - ry - 5, 4, 7);
+  const fire = lit ? '#ff3a10' : '#120402';
+  const core = lit ? '#ffd040' : '#120402';
+  // yeux fendus et inclinés (regard furieux)
+  for (const s of [-1, 1]) {
+    g.fillStyle = fire;
+    g.beginPath(); g.moveTo(cx + s * rx * 0.12, cy - ry * 0.02); g.lineTo(cx + s * rx * 0.62, cy - ry * 0.42); g.lineTo(cx + s * rx * 0.5, cy + ry * 0.05); g.fill();
+    g.fillStyle = core; g.fillRect(cx + s * rx * 0.38 - 1, cy - ry * 0.12, 2, 2);
+  }
+  // gueule béante pleine de crocs
+  const mh = ry * (mouthOpen ? 0.7 : 0.42);
+  const top = cy + ry * 0.18, w = rx * 0.72;
   g.fillStyle = fire;
-  // yeux triangulaires
-  for (const s of [-1, 1]) { g.beginPath(); g.moveTo(cx + s * rx * 0.2, cy - ry * 0.05); g.lineTo(cx + s * rx * 0.55, cy - ry * 0.05); g.lineTo(cx + s * rx * 0.38, cy - ry * 0.45); g.fill(); }
-  // bouche dentelée
-  const mh = ry * (mouthOpen ? 0.55 : 0.28);
-  g.beginPath(); g.moveTo(cx - rx * 0.6, cy + ry * 0.2);
-  for (let i = 0; i <= 6; i++) g.lineTo(cx - rx * 0.6 + (i * rx * 1.2) / 6, cy + ry * 0.2 + (i % 2 ? mh * 0.3 : 0));
-  g.lineTo(cx + rx * 0.5, cy + ry * 0.2 + mh); g.lineTo(cx - rx * 0.5, cy + ry * 0.2 + mh); g.fill();
-  if (lit) { g.fillStyle = '#fff8c0'; g.fillRect(cx - 2, cy + ry * 0.3, 4, 2); }
+  g.beginPath(); g.moveTo(cx - w, top); g.quadraticCurveTo(cx, top + mh * 2, cx + w, top); g.fill();
+  g.fillStyle = lit ? '#ffb030' : '#220a04';
+  g.beginPath(); g.ellipse(cx, top + mh * 0.5, w * 0.5, mh * 0.35, 0, 0, 7); g.fill();
+  g.fillStyle = '#e8dcb0';
+  for (let i = 0; i < 7; i++) {
+    const x = cx - w + 2 + (i * (2 * w - 4)) / 6;
+    g.beginPath(); g.moveTo(x - 1.6, top); g.lineTo(x + 1.6, top); g.lineTo(x, top + mh * 0.55); g.fill();
+    if (i % 2) { g.beginPath(); g.moveTo(x - 1.4, top + mh * 0.95); g.lineTo(x + 1.4, top + mh * 0.95); g.lineTo(x, top + mh * 0.5); g.fill(); }
+  }
+  // jus noirâtre qui coule de la gueule
+  g.fillStyle = '#3a0a04'; g.fillRect(cx - 4, top + mh * 0.9, 1.5, ry * 0.5); g.fillRect(cx + 5, top + mh * 0.8, 1.2, ry * 0.4);
 }
 function drawPumpkin(g, r, pose) {
   if (pose.startsWith('die')) {
     const k = +pose[3];
     shadow(g, 32, 18);
-    if (k < 2) { pumpkinHead(g, 32, 34 + k * 14, 15, 12 - k * 2, false, k === 0); sparks(g, r, 20, 32, 34 + k * 14, 16, ['#ffd040', '#ff7010']); return; }
-    for (let i = 0; i < 6; i++) ell(g, 14 + i * 7, 58 + (i % 2), 5, 3, i % 2 ? '#c85a10' : '#9a4008');
-    g.fillStyle = '#f0e0a0'; for (let i = 0; i < 8; i++) g.fillRect(12 + r() * 40, 56 + r() * 5, 2, 1);
-    g.strokeStyle = '#2a3a10'; g.lineWidth = 2; g.beginPath(); g.moveTo(20, 61); g.quadraticCurveTo(32, 54, 46, 61); g.stroke();
+    if (k < 2) { pumpkinHead(g, 32, 34 + k * 14, 15, 12 - k * 2, true, k === 0); sparks(g, r, 22, 32, 34 + k * 14, 16, ['#ff3a10', '#ffd040', '#3a0a04']); return; }
+    for (let i = 0; i < 6; i++) ell(g, 14 + i * 7, 58 + (i % 2), 5, 3, i % 2 ? '#6a2808' : '#3a1404');
+    ell(g, 32, 61, 18, 2, '#2a0804');
+    g.fillStyle = '#d8c890'; for (let i = 0; i < 8; i++) g.fillRect(12 + r() * 40, 56 + r() * 5, 2, 1);
     return;
   }
   shadow(g, 32, 13);
   const step = pose === 'walk1' ? 1 : 0;
-  // corps de lianes et cape en lambeaux
-  g.strokeStyle = '#2a3a10'; g.lineWidth = 3;
-  g.beginPath(); g.moveTo(28, 62); g.quadraticCurveTo(24 + step * 4, 50, 30, 38); g.stroke();
-  g.beginPath(); g.moveTo(36, 62); g.quadraticCurveTo(40 - step * 4, 50, 34, 38); g.stroke();
-  g.fillStyle = '#1a1214';
-  g.beginPath(); g.moveTo(20, 30); g.lineTo(44, 30); g.lineTo(48, 52); for (let i = 0; i < 5; i++) g.lineTo(46 - i * 6, i % 2 ? 54 : 48); g.lineTo(16, 52); g.fill();
-  // bras-lianes
-  const up = pose === 'attack' ? -10 : 0;
-  g.strokeStyle = '#3a4a14'; g.lineWidth = 2.5;
-  g.beginPath(); g.moveTo(22, 32); g.quadraticCurveTo(10, 36 + up, 8, 26 + up); g.stroke();
-  g.beginPath(); g.moveTo(42, 32); g.quadraticCurveTo(54, 36 + up, 56, 26 + up); g.stroke();
-  pumpkinHead(g, 32, 18, 15, 12, pose === 'attack');
-  if (pose === 'attack') ell(g, 32, 24, 10, 6, 'rgba(255,200,40,.45)');
-  if (pose === 'pain') { g.fillStyle = 'rgba(255,255,255,.35)'; g.fillRect(16, 4, 32, 52); }
+  // jambes de ronces
+  g.strokeStyle = '#1a1a0a'; g.lineWidth = 3;
+  g.beginPath(); g.moveTo(27, 62); g.quadraticCurveTo(23 + step * 4, 50, 29, 36); g.stroke();
+  g.beginPath(); g.moveTo(37, 62); g.quadraticCurveTo(41 - step * 4, 50, 35, 36); g.stroke();
+  g.fillStyle = '#2a2a10'; for (let i = 0; i < 6; i++) g.fillRect(24 + (i % 2) * 14 + step, 40 + i * 3.5, 2, 1);
+  // cape noire déchiquetée
+  g.fillStyle = '#0c080a';
+  g.beginPath(); g.moveTo(18, 28); g.lineTo(46, 28); g.lineTo(50, 54); for (let i = 0; i < 6; i++) g.lineTo(48 - i * 6.5, i % 2 ? 58 : 47); g.lineTo(14, 54); g.fill();
+  // bras-ronces terminés par des griffes
+  const up = pose === 'attack' ? -12 : 0;
+  g.strokeStyle = '#1e200c'; g.lineWidth = 2.5;
+  for (const s of [-1, 1]) {
+    const ex = 32 + s * 25, ey = 24 + up;
+    g.beginPath(); g.moveTo(32 + s * 11, 30); g.quadraticCurveTo(32 + s * 22, 36 + up, ex, ey); g.stroke();
+    g.strokeStyle = '#c8c0a0'; g.lineWidth = 1;
+    for (let f = -1; f <= 1; f++) { g.beginPath(); g.moveTo(ex, ey); g.lineTo(ex + s * 4, ey - 5 + f * 3); g.stroke(); }
+    g.strokeStyle = '#1e200c'; g.lineWidth = 2.5;
+  }
+  pumpkinHead(g, 32, 17, 15, 12, pose === 'attack');
+  if (pose === 'attack') ell(g, 32, 24, 11, 7, 'rgba(255,60,20,.4)');
+  if (pose === 'pain') { g.fillStyle = 'rgba(255,255,255,.35)'; g.fillRect(14, 2, 36, 56); }
 }
 
-// ——— Zombie (m) ———
+// ——— Zombie (m) : cadavre décharné, mâchoire pendante, œil arraché ———
 function drawZombie(g, r, pose) {
   if (pose.startsWith('die')) {
     const k = +pose[3];
     shadow(g, 32, 20);
     if (k < 2) {
-      g.save(); g.translate(32, 62); g.rotate(k ? 1.2 : 0.5); g.translate(-32, -62);
+      g.save(); g.translate(32, 62); g.rotate(k ? 1.25 : 0.5); g.translate(-32, -62);
       drawZombieBody(g, r, 'pain', 0); g.restore();
+      ell(g, 30, 60, 10 + k * 6, 2 + k, '#3a0406');
       return;
     }
-    ell(g, 34, 58, 22, 5, '#3a0a0c');
-    g.fillStyle = '#4a5a3a'; g.fillRect(12, 54, 28, 6);
-    g.fillStyle = '#3a2a2a'; g.fillRect(26, 52, 20, 7);
-    ell(g, 48, 55, 6, 5, '#6a7a52');
-    g.fillStyle = '#1a1010'; g.fillRect(46, 54, 2, 1); g.fillRect(50, 54, 2, 1);
+    ell(g, 34, 58, 24, 5, '#2a0204');
+    ell(g, 30, 58, 14, 3, '#4a0608');
+    g.fillStyle = '#4a5240'; g.fillRect(12, 54, 28, 6);
+    g.fillStyle = '#c8c0a0'; for (let i = 0; i < 4; i++) g.fillRect(16 + i * 5, 52, 2, 5);
+    ell(g, 48, 55, 6, 5, '#5a6450');
+    g.fillStyle = '#000'; g.fillRect(45, 53, 3, 3); g.fillRect(50, 54, 2, 2);
     return;
   }
   shadow(g, 32, 14);
   drawZombieBody(g, r, pose, pose === 'walk1' ? 1 : 0);
 }
 function drawZombieBody(g, r, pose, step) {
-  // jambes (une traîne)
-  g.fillStyle = '#2a2a3a';
-  g.fillRect(24 - step * 2, 40, 7, 22); g.fillRect(34 + step * 3, 40, 7, 20 + step * 2);
-  g.fillStyle = '#4a3a2a'; g.fillRect(22 - step * 2, 59, 10, 4); g.fillRect(33 + step * 3, 59, 10, 4);
-  // torse : chemise déchirée
-  g.fillStyle = '#5a5240'; g.beginPath(); g.moveTo(20, 18); g.lineTo(44, 18); g.lineTo(42, 42); g.lineTo(22, 42); g.fill();
-  g.fillStyle = '#7a8a5a'; g.fillRect(28, 24, 8, 10);              // peau visible
-  g.fillStyle = '#c8c0a0'; for (let i = 0; i < 3; i++) g.fillRect(29, 25 + i * 3, 6, 1); // côtes
-  g.fillStyle = '#5a0a0c'; g.fillRect(22, 30, 5, 8); g.fillRect(38, 22, 3, 6);
-  // bras tendus
-  const up = pose === 'attack' ? -10 : 0;
-  g.fillStyle = '#6a7a52';
-  g.save(); g.translate(20, 22); g.rotate(-1.25 + (pose === 'attack' ? -0.5 : step * 0.15)); g.fillRect(-3, 0, 6, 20); g.restore();
-  g.save(); g.translate(44, 22); g.rotate(1.25 + (pose === 'attack' ? 0.5 : -step * 0.15)); g.fillRect(-3, 0, 6, 20); g.restore();
-  g.fillStyle = '#3a4a2a'; g.fillRect(2, 22 + up, 6, 4); g.fillRect(56, 22 + up, 6, 4);
-  // tête penchée
-  g.fillStyle = '#7a8a5a'; g.beginPath(); g.ellipse(33, 11, 7, 8, 0.2, 0, 7); g.fill();
-  g.fillStyle = '#2a1a10'; g.fillRect(26, 3, 14, 4);
-  g.fillStyle = pose === 'pain' ? '#ffffff' : '#e8f040'; g.fillRect(29, 9, 2, 2); g.fillRect(35, 10, 2, 2);
-  g.fillStyle = '#1a0a08'; g.fillRect(30, 15, 7, pose === 'attack' ? 4 : 2);
-  g.fillStyle = '#5a0a0c'; g.fillRect(31, 17, 1, 4);
-  if (pose === 'pain') { g.fillStyle = 'rgba(255,255,255,.35)'; g.fillRect(18, 2, 28, 44); }
+  const skin = '#6e7a64', dark = '#3e4638', blood = '#5a0406';
+  // jambes maigres, une traîne
+  g.fillStyle = '#22222a';
+  g.fillRect(25 - step * 2, 42, 6, 20); g.fillRect(34 + step * 3, 42, 6, 18 + step * 2);
+  g.fillStyle = skin; g.fillRect(25 - step * 2, 52, 6, 4); // chair visible par la déchirure
+  g.fillStyle = blood; g.fillRect(26 - step * 2, 54, 4, 2);
+  // torse voûté, chemise en lambeaux
+  g.fillStyle = '#3a3428';
+  g.beginPath(); g.moveTo(19, 20); g.lineTo(45, 18); g.lineTo(43, 44); for (let i = 0; i < 5; i++) g.lineTo(41 - i * 5, i % 2 ? 46 : 41); g.lineTo(21, 44); g.fill();
+  // cage thoracique ouverte
+  g.fillStyle = '#2a0a08'; g.beginPath(); g.ellipse(32, 30, 7, 9, 0, 0, 7); g.fill();
+  g.fillStyle = '#d8d0b0'; for (let i = 0; i < 4; i++) { g.fillRect(26, 24 + i * 3.5, 5, 1.2); g.fillRect(33, 24 + i * 3.5, 5, 1.2); }
+  g.fillStyle = blood; g.fillRect(24, 34, 3, 10); g.fillRect(38, 22, 2, 14); g.fillRect(30, 38, 6, 3);
+  // bras décharnés tendus, longues griffes
+  const lift = pose === 'attack' ? -0.6 : step * 0.12;
+  for (const s of [-1, 1]) {
+    g.save(); g.translate(32 + s * 12, 22); g.rotate(s * (1.3 - lift));
+    g.fillStyle = skin; g.fillRect(-2.5, 0, 5, 20);
+    g.fillStyle = dark; g.fillRect(-2.5, 8, 5, 2);
+    g.strokeStyle = '#e0d8b8'; g.lineWidth = 1;
+    for (let f = -1; f <= 1; f++) { g.beginPath(); g.moveTo(f * 1.5, 20); g.lineTo(f * 2.5, 26); g.stroke(); }
+    g.restore();
+  }
+  // tête penchée, cheveux arrachés
+  g.save(); g.translate(33, 11); g.rotate(0.25);
+  g.fillStyle = skin; g.beginPath(); g.ellipse(0, 0, 7, 8.5, 0, 0, 7); g.fill();
+  g.fillStyle = '#1a1612'; g.fillRect(-7, -9, 9, 3); g.fillRect(3, -8, 3, 2);
+  // orbite vide à gauche, œil laiteux à droite
+  ell(g, -3, -1, 2.4, 2.8, '#000');
+  ell(g, 3, -1, 2, 2, pose === 'pain' ? '#ffffff' : '#d8e0c0'); g.fillStyle = '#ff2a10'; g.fillRect(3, -1, 1, 1);
+  g.fillStyle = blood; g.fillRect(-4, 1, 1.2, 5); // larme de sang
+  // mâchoire pendante pleine de dents
+  const jaw = pose === 'attack' ? 7 : 4;
+  g.fillStyle = '#0a0202'; g.fillRect(-4, 4, 8, jaw);
+  g.fillStyle = '#d8d0a8'; for (let i = 0; i < 4; i++) { g.fillRect(-3.5 + i * 2, 4, 1, 1.5); g.fillRect(-3.5 + i * 2, 3 + jaw, 1, 1.5); }
+  g.fillStyle = blood; g.fillRect(-2, 4 + jaw, 1.2, 4); g.fillRect(2, 4 + jaw, 1, 3);
+  g.restore();
+  if (pose === 'pain') { g.fillStyle = 'rgba(255,255,255,.35)'; g.fillRect(16, 0, 32, 46); }
 }
 
 // ——— Gardien de la crypte (G, 128 px) : crâne géant couronné de bougies ———
@@ -355,9 +411,9 @@ export function buildHalloweenSprites() {
   const warm = (r, g, b) => bright(r, g, b) || (r > 230 && g > 150 && b < 120);
   const S = {
     enemy: {
-      g: enemyFrames(drawGhost, 64, (r, g, b) => g > 230 && r < 150),
-      s: enemyFrames(drawPumpkin, 64, (r, g, b) => r > 240 && g > 180 && b < 120),
-      m: enemyFrames(drawZombie, 64, (r, g, b) => r > 220 && g > 220 && b < 100),
+      g: enemyFrames(drawGhost, 64, (r, g, b) => (r > 230 && g < 60) || (r > 225 && g > 235 && b > 245)),
+      s: enemyFrames(drawPumpkin, 64, (r, g, b) => r > 240 && b < 100 && (g < 80 || g > 150)),
+      m: enemyFrames(drawZombie, 64, (r, g, b) => r > 240 && g < 60),
       G: enemyFrames(drawGuardian, 128, (r, g, b) => bright(r, g, b) || (r > 160 && b > 220 && g < 140) || (r > 240 && g > 180 && b < 120)),
       O: enemyFrames(drawKing, 128, warm),
     },

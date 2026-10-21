@@ -511,6 +511,7 @@ function updateHud() {
   if (last.bat !== bat) { last.bat = bat; H.bat.style.width = bat + '%'; }
   H.bat.classList.toggle('low', p.battery < 20);
   H.bat.classList.toggle('off', !p.lamp);
+  H.bat.classList.toggle('charging', !!p.recharging || (!p.lamp && p.battery < 100));
   H.kb.classList.toggle('on', p.keys.blue);
   H.kr.classList.toggle('on', p.keys.red);
   const b = game.boss;
