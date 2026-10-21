@@ -65,6 +65,11 @@ button, select, input { font: inherit; color: inherit; }
 #hud .keys i.on#k-blue { background: var(--blue); border: 0; box-shadow: 0 0 10px var(--blue); }
 #hud .keys i.on#k-red { background: var(--red); border: 0; box-shadow: 0 0 10px var(--red); }
 @keyframes blink { 50% { opacity: .45; } }
+#hud .bat { display: block; width: 74px; height: 14px; margin-top: 6px; border: 1px solid rgba(255, 255, 255, .25); border-radius: 3px; padding: 2px; position: relative; }
+#hud .bat::after { content: ""; position: absolute; right: -4px; top: 3px; width: 3px; height: 6px; background: rgba(255, 255, 255, .25); }
+#hud .bat i { display: block; height: 100%; background: #ffd27a; box-shadow: 0 0 8px #ffb02e; transition: width .3s; }
+#hud .bat i.low { background: var(--red); box-shadow: 0 0 8px var(--red); animation: blink 1s infinite; }
+#hud .bat i.off { opacity: .3; }
 
 /* Tactile */
 #touch { position: absolute; inset: 0; }
@@ -78,6 +83,7 @@ button, select, input { font: inherit; color: inherit; }
 .b-fire.on { background: rgba(255, 59, 78, .45); }
 .b-use { right: calc(134px + var(--safe-r)); bottom: calc(150px + var(--safe-b)); width: 64px; height: 64px; font-size: 13px; }
 .b-next { right: calc(130px + var(--safe-r)); bottom: calc(76px + var(--safe-b)); width: 54px; height: 54px; font-size: 22px; }
+.b-lamp { right: calc(196px + var(--safe-r)); bottom: calc(96px + var(--safe-b)); width: 48px; height: 48px; font-size: 20px; }
 .b-pause { left: calc(14px + var(--safe-l)); top: 60px; width: 42px; height: 42px; font-size: 13px; }
 .b-map { left: calc(64px + var(--safe-l)); top: 60px; width: 42px; height: 42px; font-size: 18px; }
 .touch #messages { top: 112px; }
@@ -136,6 +142,7 @@ kbd { font-family: var(--mono); font-size: 12px; padding: 1px 6px; border: 1px s
   #hud b { font-size: 18px; }
   #hud label { font-size: 8px; }
   #hud .monitor { display: none; }
+  #hud .bat { width: 48px; }
   #minimap { width: 104px; height: 104px; }
   #messages { font-size: 12px; }
   .screen { gap: 10px; }

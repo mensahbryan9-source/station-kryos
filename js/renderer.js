@@ -1,11 +1,23 @@
 // Moteur de raycasting logiciel : murs, portes, sol, plafond, sprites.
+// Éclairage : lumière ambiante + lampe torche (cône centré sur l'écran,
+// atténuée avec la distance) ; brouillard selon la distance ; pixels émissifs
+// modulés par un facteur de scintillement.
 import { EMPTY, DOOR, MOVING } from './world.js';
+
+const CONE_SIZE = 4096;
 
 export class Renderer {
   constructor(canvas) {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d', { alpha: false });
     this.fov = 66;
+    // Profil du cône de la lampe : 0..256 selon r² (r = distance au centre / rayon).
+    this.cone = new Int32Array(CONE_SIZE);
+    for (let i = 0; i < CONE_SIZE; i++) {
+      const r = Math.sqrt(i / 1024);
+      let v = r < 1 ? Math.pow(1 - r * r, 0.9) * 0.88 + 0.12 : r < 1.7 ? 0.12 * (1 - (r - 1) / 0.7) : 0;
+      this.cone[i] = (v * 256) | 0;
+    }
     this.resize(320, 180);
   }
 
@@ -17,17 +29,24 @@ export class Renderer {
     this.img = this.ctx.createImageData(w, h);
     this.buf = new Uint32Array(this.img.data.buffer);
     this.zbuf = new Float32Array(w);
-    this.rowDist = new Float32Array(h * 2);
+    this.rowDist = new Float32Array(h);
+    this.rowBase = new Int32Array(h);
+    this.rowFlash = new Int32Array(h);
+    this.rowFog = new Int32Array(h * 3);
+    this.colTerm = new Int32Array(w);
+    this.rowTerm = new Int32Array(h);
   }
 
-  // Calcule l'ombrage pour une distance : renvoie [s, fogR, fogG, fogB] pré-multipliés.
-  shade(d, out) {
-    let s = 1 - d / this.fogDist;
-    s = s < 0 ? 0 : s;
-    s = (s * s * 0.85 + s * 0.15) * this.light;
-    let si = (s * 256) | 0; if (si > 256) si = 256;
-    const f = 256 - si;
-    out[0] = si; out[1] = this.fogR * f; out[2] = this.fogG * f; out[3] = this.fogB * f;
+  // Lumière pour une distance d : visibilité (brouillard), part ambiante et part lampe.
+  light(d, out) {
+    let vis = 1 - d / this.fogDist;
+    vis = vis <= 0 ? 0 : Math.pow(vis, 1.25);
+    const att = 1 / (1 + 0.07 * d * d);
+    out[0] = (this.ambient * vis * 256) | 0;
+    out[1] = (this.flash * att * vis * 256) | 0;
+    const f = 256 - ((vis * 256) | 0);
+    out[2] = this.fogR * f; out[3] = this.fogG * f; out[4] = this.fogB * f;
+    out[5] = (this.emissive * (vis < 0.35 ? 0.35 : vis) * 256) | 0;
   }
 
   render(game) {
@@ -40,26 +59,29 @@ export class Renderer {
     const proj = w / (2 * k);
     const horizon = (h >> 1) + (p.bobY * h) | 0;
     const px = p.x, py = p.y;
-    const fog = game.level.fog;
-    this.fogR = fog[0]; this.fogG = fog[1]; this.fogB = fog[2];
-    this.fogDist = 11 * (1 + game.flash * 0.6);
-    this.light = game.level.light * (1 + game.flash * 0.35);
-    const sh = [0, 0, 0, 0];
+    const L = game.lighting();
+    this.fogR = L.fog[0]; this.fogG = L.fog[1]; this.fogB = L.fog[2];
+    this.fogDist = L.fogDist; this.ambient = L.ambient; this.flash = L.flash; this.emissive = L.emissive;
+    const lt = [0, 0, 0, 0, 0, 0];
     const floorT = T[game.floorTex], ceilT = T[game.ceilTex];
     const doorSide = T[game.doorSideTex];
     const mv = world.moving;
+    const cone = this.cone, CT = this.colTerm, RT = this.rowTerm;
+
+    // Termes du cône (r² × 1024) par colonne et par ligne, centrés sur le viseur.
+    const R = h * 0.5, R2 = 1024 / (R * R), cx = w / 2;
+    for (let x = 0; x < w; x++) { const v = ((x - cx) * (x - cx) * R2) | 0; CT[x] = v > 2047 ? 2047 : v; }
+    for (let y = 0; y < h; y++) { const v = ((y - horizon) * (y - horizon) * R2) | 0; RT[y] = v > 2047 ? 2047 : v; }
 
     // Pré-calcul par ligne pour le sol et le plafond.
-    const rowS = this.rowS || (this.rowS = new Int32Array(h * 4 * 2));
-    if (rowS.length < h * 4) this.rowS = new Int32Array(h * 4);
-    const RS = this.rowS, RD = this.rowDist;
+    const RD = this.rowDist, RB = this.rowBase, RF = this.rowFlash, RG = this.rowFog;
     for (let y = 0; y < h; y++) {
-      const dy = Math.abs(y - horizon) + 0.5;
-      const d = (0.5 * proj) / dy;
+      const d = (0.5 * proj) / (Math.abs(y - horizon) + 0.5);
       RD[y] = d;
-      this.shade(d, sh);
-      RS[y * 4] = sh[0]; RS[y * 4 + 1] = sh[1]; RS[y * 4 + 2] = sh[2]; RS[y * 4 + 3] = sh[3];
+      this.light(d, lt);
+      RB[y] = lt[0]; RF[y] = lt[1]; RG[y * 3] = lt[2]; RG[y * 3 + 1] = lt[3]; RG[y * 3 + 2] = lt[4];
     }
+    const eFloor = (this.emissive * 0.8 * 256) | 0;
 
     for (let x = 0; x < w; x++) {
       const camX = (2 * x) / w - 1;
@@ -95,8 +117,8 @@ export class Renderer {
         if (t === MOVING) {
           // intersection rayon / boîte du mur en mouvement
           const ix = 1 / rdx, iy = 1 / rdy;
-          let t1 = (mv.x - px) * ix, t2 = (mv.x + 1 - px) * ix;
-          let t3 = (mv.y - py) * iy, t4 = (mv.y + 1 - py) * iy;
+          const t1 = (mv.x - px) * ix, t2 = (mv.x + 1 - px) * ix;
+          const t3 = (mv.y - py) * iy, t4 = (mv.y + 1 - py) * iy;
           const tminX = Math.min(t1, t2), tmaxX = Math.max(t1, t2);
           const tminY = Math.min(t3, t4), tmaxY = Math.max(t3, t4);
           const tmin = Math.max(tminX, tminY), tmax = Math.min(tmaxX, tmaxY);
@@ -123,52 +145,57 @@ export class Renderer {
       texX &= 63;
 
       const lineH = proj / perp;
-      let y0 = Math.floor(horizon - lineH / 2), y1 = Math.floor(horizon + lineH / 2);
+      const y0 = Math.floor(horizon - lineH / 2), y1 = Math.floor(horizon + lineH / 2);
       const step = 64 / lineH;
       let texPos = (Math.max(0, y0) - (horizon - lineH / 2)) * step;
       const ys = y0 < 0 ? 0 : y0, ye = y1 > h ? h : y1;
-      this.shade(perp, sh);
-      let s = sh[0]; if (side === 1) s = (s * 0.8) | 0;
-      const fr = this.fogR * (256 - s), fg = this.fogG * (256 - s), fb = this.fogB * (256 - s);
+      this.light(perp, lt);
+      let base = lt[0], fl = lt[1];
+      if (side === 1) { base = (base * 0.8) | 0; fl = (fl * 0.85) | 0; }
+      const fr = lt[2], fg = lt[3], fb = lt[4], eg = lt[5];
+      const ctx_ = CT[x];
       let o = ys * w + x;
       for (let y = ys; y < ye; y++) {
         const c = tex[((texPos & 63) << 6) | texX];
         texPos += step;
-        if (c >>> 24 === 254) buf[o] = c | 0xff000000;
-        else buf[o] = 0xff000000 | ((((c >> 16) & 255) * s + fb) >> 8) << 16 | ((((c >> 8) & 255) * s + fg) >> 8) << 8 | (((c & 255) * s + fr) >> 8);
+        if (c >>> 24 === 254) {
+          buf[o] = 0xff000000 | ((((c >> 16) & 255) * eg) >> 8) << 16 | ((((c >> 8) & 255) * eg) >> 8) << 8 | (((c & 255) * eg) >> 8);
+        } else {
+          let s = base + ((fl * cone[ctx_ + RT[y]]) >> 8); if (s > 256) s = 256;
+          buf[o] = 0xff000000 | ((((c >> 16) & 255) * s + fb) >> 8) << 16 | ((((c >> 8) & 255) * s + fg) >> 8) << 8 | (((c & 255) * s + fr) >> 8);
+        }
         o += w;
       }
 
-      // Sol
-      for (let y = ye > horizon ? ye : horizon + 1; y < h; y++) {
-        const d = RD[y];
-        const fx = px + d * rdx, fy = py + d * rdy;
-        const c = floorT[(((fy * 64) & 63) << 6) | ((fx * 64) & 63)];
-        const r4 = y * 4, ss = RS[r4];
-        const oo = y * w + x;
-        if (c >>> 24 === 254) buf[oo] = c | 0xff000000;
-        else buf[oo] = 0xff000000 | ((((c >> 16) & 255) * ss + RS[r4 + 3]) >> 8) << 16 | ((((c >> 8) & 255) * ss + RS[r4 + 2]) >> 8) << 8 | (((c & 255) * ss + RS[r4 + 1]) >> 8);
-      }
-      // Plafond
-      const ce = ys < horizon ? ys : horizon;
-      for (let y = 0; y < ce; y++) {
-        const d = RD[y];
-        const fx = px + d * rdx, fy = py + d * rdy;
-        const c = ceilT[(((fy * 64) & 63) << 6) | ((fx * 64) & 63)];
-        const r4 = y * 4, ss = RS[r4];
-        const oo = y * w + x;
-        if (c >>> 24 === 254) buf[oo] = c | 0xff000000;
-        else buf[oo] = 0xff000000 | ((((c >> 16) & 255) * ss + RS[r4 + 3]) >> 8) << 16 | ((((c >> 8) & 255) * ss + RS[r4 + 2]) >> 8) << 8 | (((c & 255) * ss + RS[r4 + 1]) >> 8);
+      // Sol puis plafond (même calcul, ligne par ligne)
+      for (let pass = 0; pass < 2; pass++) {
+        const from = pass ? 0 : (ye > horizon ? ye : horizon + 1);
+        const to = pass ? (ys < horizon ? ys : horizon) : h;
+        const T2 = pass ? ceilT : floorT;
+        for (let y = from; y < to; y++) {
+          const d = RD[y];
+          const fx = px + d * rdx, fy = py + d * rdy;
+          const c = T2[(((fy * 64) & 63) << 6) | ((fx * 64) & 63)];
+          const oo = y * w + x;
+          if (c >>> 24 === 254) {
+            buf[oo] = 0xff000000 | ((((c >> 16) & 255) * eFloor) >> 8) << 16 | ((((c >> 8) & 255) * eFloor) >> 8) << 8 | (((c & 255) * eFloor) >> 8);
+            continue;
+          }
+          let s = RB[y] + ((RF[y] * cone[ctx_ + RT[y]]) >> 8); if (s > 256) s = 256;
+          const r3 = y * 3;
+          buf[oo] = 0xff000000 | ((((c >> 16) & 255) * s + RG[r3 + 2]) >> 8) << 16 | ((((c >> 8) & 255) * s + RG[r3 + 1]) >> 8) << 8 | (((c & 255) * s + RG[r3]) >> 8);
+        }
       }
     }
 
-    this.drawSprites(game, dirX, dirY, planeX, planeY, proj, horizon, sh);
+    this.drawSprites(game, dirX, dirY, planeX, planeY, proj, horizon, lt);
     this.ctx.putImageData(this.img, 0, 0);
   }
 
-  drawSprites(game, dirX, dirY, planeX, planeY, proj, horizon, sh) {
+  drawSprites(game, dirX, dirY, planeX, planeY, proj, horizon, lt) {
     const { w, h, buf, zbuf } = this;
     const p = game.player;
+    const cone = this.cone, CT = this.colTerm, RT = this.rowTerm;
     const list = game.collectSprites();
     const invDet = 1 / (planeX * dirY - dirX * planeY);
     for (const s of list) {
@@ -191,26 +218,34 @@ export class Renderer {
       if (x0 >= x1) continue;
       const y0 = Math.max(0, Math.floor(top)), y1 = Math.min(h, Math.ceil(bottom));
       if (y0 >= y1) continue;
-      this.shade(depth, sh);
-      let ss = sh[0];
-      if (s.hurt) ss = 256;
-      const fr = sh[1], fg = sh[2], fb = sh[3];
-      const tint = s.tint || 0;
+      this.light(depth, lt);
+      let base = lt[0], fl = lt[1];
+      if (s.hurt) { base = 256; fl = 0; }
+      const fr = lt[2], fg = lt[3], fb = lt[4], eg = lt[5];
+      const tint = s.tint || 0, ghost = s.ghost || 0;
       const stepU = sw / size, stepV = shh / size;
       for (let x = x0; x < x1; x++) {
         if (zbuf[x] < depth) continue;
         const tu = ((x - left) * stepU) | 0;
         if (tu < 0 || tu >= sw) continue;
+        const cxv = CT[x];
         let v = (y0 - top) * stepV;
         let o = y0 * w + x;
         for (let y = y0; y < y1; y++, o += w, v += stepV) {
           const c = data[(v | 0) * sw + tu];
           const a = c >>> 24;
           if (a === 0) continue;
-          if (a === 254 || s.bright) { buf[o] = c | 0xff000000; continue; }
-          let r = c & 255, g = (c >> 8) & 255, b = (c >> 16) & 255;
-          if (tint) { r = Math.min(255, r + 120); g = g >> 1; b = b >> 1; }
-          buf[o] = 0xff000000 | ((b * ss + fb) >> 8) << 16 | ((g * ss + fg) >> 8) << 8 | ((r * ss + fr) >> 8);
+          let out;
+          if (a === 254 || s.bright) {
+            out = s.bright ? c | 0xff000000 : 0xff000000 | ((((c >> 16) & 255) * eg) >> 8) << 16 | ((((c >> 8) & 255) * eg) >> 8) << 8 | (((c & 255) * eg) >> 8);
+          } else {
+            let r = c & 255, g = (c >> 8) & 255, b = (c >> 16) & 255;
+            if (tint) { r = Math.min(255, r + 120); g = g >> 1; b = b >> 1; }
+            let ss = base + ((fl * cone[cxv + RT[y]]) >> 8); if (ss > 256) ss = 256;
+            out = 0xff000000 | ((b * ss + fb) >> 8) << 16 | ((g * ss + fg) >> 8) << 8 | ((r * ss + fr) >> 8);
+          }
+          // Fantômes : mélange 50/50 avec le décor derrière.
+          buf[o] = ghost ? 0xff000000 | (((buf[o] & 0xfefefe) >> 1) + ((out & 0xfefefe) >> 1)) : out;
         }
       }
     }

@@ -191,6 +191,7 @@ const SOUNDS = {
   weapon: (a, o) => { a.noise(0.15, 0.4, o, { type: 'bandpass', f0: 1500, f1: 800, q: 2 }); [0, 3, 7, 12].forEach((n, i) => a.osc('square', 330 * Math.pow(2, n / 12), 330 * Math.pow(2, n / 12), 0.12, 0.12, o, 0.1 + i * 0.06)); },
   boom: (a, o) => { a.noise(1.0, 1.0, o, { f0: 3000, f1: 50 }); a.osc('sine', 90, 25, 0.8, 1.0, o); },
   exit: (a, o) => [0, 4, 7, 11, 14].forEach((n, i) => a.osc('triangle', 392 * Math.pow(2, n / 12), 392 * Math.pow(2, n / 12), 0.6, 0.18, o, i * 0.09)),
+  click: (a, o) => { a.noise(0.03, 0.4, o, { type: 'highpass', f0: 3000, f1: 2500 }); a.osc('square', 2200, 1800, 0.02, 0.08, o); },
   blip: (a, o) => a.osc('square', 1100, 1100, 0.04, 0.12, o),
   select: (a, o) => { a.osc('square', 660, 660, 0.05, 0.14, o); a.osc('square', 1320, 1320, 0.07, 0.14, o, 0.05); },
   step: (a, o) => a.noise(0.05, 0.06, o, { type: 'bandpass', f0: 700, f1: 400, q: 2 }),

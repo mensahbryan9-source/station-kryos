@@ -33,6 +33,7 @@
     <div class="cell"><label>ARMURE</label><b id="h-armor">0</b></div>
     <div class="cell monitor"><canvas id="ecg" width="120" height="40"></canvas></div>
     <div class="cell wide"><label id="h-wname">PISTOLET</label><b id="h-ammo">40</b></div>
+    <div class="cell lampcell"><label>LAMPE <kbd>F</kbd></label><span class="bat"><i id="h-bat"></i></span></div>
     <div class="cell keys"><label>CARTES</label><span><i id="k-blue"></i><i id="k-red"></i></span></div>
     <div class="cell"><label>SCORE</label><b id="h-score">0</b></div>
     <div class="cell"><label>SECTEUR</label><b id="h-level">1</b></div>
@@ -44,6 +45,7 @@
     <button class="tb b-pause" aria-label="Pause">❚❚</button>
     <button class="tb b-map" aria-label="Carte">▦</button>
     <button class="tb b-next" aria-label="Arme suivante">⟳</button>
+    <button class="tb b-lamp" aria-label="Lampe torche">☀</button>
     <button class="tb b-use" aria-label="Utiliser">USE</button>
     <button class="tb b-fire" aria-label="Tirer">FEU</button>
   </div>
@@ -92,7 +94,8 @@
       <label>Musique <input type="range" id="o-music" min="0" max="1" step="0.05"><output></output></label>
       <label>Qualité d'image
         <select id="o-quality">
-          <option value="180">Rétro (180p)</option>
+          <option value="auto">Automatique (recommandé)</option>
+          <option value="180">Basse (180p)</option>
           <option value="270">Moyenne (270p)</option>
           <option value="360">Haute (360p)</option>
           <option value="480">Ultra (480p)</option>
@@ -115,6 +118,7 @@
           <li><kbd>Espace</kbd> / <kbd>E</kbd> / <kbd>Clic droit</kbd> — ouvrir, pousser, activer</li>
           <li><kbd>1</kbd>…<kbd>5</kbd> / <kbd>Molette</kbd> — changer d'arme</li>
           <li><kbd>Maj</kbd> — courir · <kbd>Alt</kbd> + flèches — pas latéral</li>
+          <li><kbd>F</kbd> — allumer / éteindre la lampe torche (batterie limitée)</li>
           <li><kbd>Tab</kbd> / <kbd>M</kbd> — carte · <kbd>Échap</kbd> / <kbd>P</kbd> — pause</li>
         </ul>
       </div>
@@ -124,10 +128,10 @@
           <li>Pouce gauche — joystick de déplacement</li>
           <li>Glisser à droite — tourner la vue</li>
           <li><b>FEU</b> — maintenir pour tirer (glisser pour viser)</li>
-          <li><b>USE</b> — ouvrir / activer · <b>⟳</b> — arme suivante</li>
+          <li><b>USE</b> — ouvrir / activer · <b>⟳</b> — arme suivante · <b>☀</b> — lampe</li>
         </ul>
         <h3>Manette</h3>
-        <ul><li>Sticks — bouger / viser · <b>RT</b> tirer · <b>A</b> utiliser · <b>LB/RB</b> armes · <b>Start</b> pause</li></ul>
+        <ul><li>Sticks — bouger / viser · <b>RT</b> tirer · <b>A</b> utiliser · <b>Y</b> lampe · <b>LB/RB</b> armes · <b>Start</b> pause</li></ul>
       </div>
     </div>
     <p class="tip">Astuce : certains murs sonnent creux… Poussez-les.</p>

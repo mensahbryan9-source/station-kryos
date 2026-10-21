@@ -238,6 +238,7 @@ const ITEMS = {
   r: (g) => { shadow(g, 32, 14); g.fillStyle = '#1f4e8a'; g.beginPath(); g.moveTo(18, 38); g.lineTo(46, 38); g.lineTo(44, 61); g.lineTo(20, 61); g.fill(); g.fillStyle = '#3f8de0'; g.fillRect(22, 42, 8, 8); g.fillRect(34, 42, 8, 8); g.fillRect(22, 52, 20, 6); g.fillStyle = '#7fd0ff'; g.fillRect(24, 43, 4, 2); g.fillRect(36, 43, 4, 2); },
   a: (g) => { shadow(g, 32, 10); g.fillStyle = '#2b333d'; g.fillRect(24, 44, 16, 17); g.fillStyle = '#56e3ff'; g.fillRect(27, 47, 10, 11); g.fillStyle = '#e6fbff'; g.fillRect(30, 49, 4, 7); g.fillStyle = '#8b97a5'; g.fillRect(28, 41, 8, 3); },
   c: (g) => { shadow(g, 32, 12); g.fillStyle = '#5a3a1c'; g.fillRect(20, 48, 24, 13); g.fillStyle = '#e38a2a'; for (let i = 0; i < 4; i++) { g.fillRect(22 + i * 6, 42, 4, 8); } g.fillStyle = '#c9b25a'; for (let i = 0; i < 4; i++) g.fillRect(22 + i * 6, 48, 4, 2); },
+  b: (g) => { shadow(g, 32, 9); for (const x of [24, 33]) { g.fillStyle = '#1b1f24'; g.fillRect(x, 44, 8, 17); g.fillStyle = '#e8b21c'; g.fillRect(x, 44, 8, 6); g.fillStyle = '#c9d2dc'; g.fillRect(x + 2, 41, 4, 3); g.fillStyle = '#ffffff'; g.fillRect(x + 1, 52, 2, 7); } },
   k: (g) => card(g, '#2f8cff'),
   K: (g) => card(g, '#ff3344'),
   t: (g) => { shadow(g, 32, 7); const grd = g.createLinearGradient(26, 36, 38, 60); grd.addColorStop(0, '#f2d6ff'); grd.addColorStop(1, '#7a3cff'); g.fillStyle = grd; g.beginPath(); g.moveTo(32, 36); g.lineTo(39, 48); g.lineTo(32, 60); g.lineTo(25, 48); g.fill(); g.fillStyle = '#ffffff'; g.fillRect(30, 42, 2, 8); },

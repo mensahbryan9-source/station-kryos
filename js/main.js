@@ -17,7 +17,7 @@ const SAVE_KEY = 'kryos-save-v1';
 const isTouch = matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window;
 const defaults = {
   unlocked: 1, best: 0,
-  opts: { sens: 1, fov: 70, sfx: 0.8, music: 0.5, quality: isTouch ? 270 : 360, minimap: true, touch: isTouch },
+  opts: { sens: 1, fov: 70, sfx: 0.8, music: 0.5, quality: 'auto', minimap: true, touch: isTouch },
 };
 let save;
 try { save = { ...defaults, ...JSON.parse(localStorage.getItem(SAVE_KEY) || '{}') }; save.opts = { ...defaults.opts, ...save.opts }; }
@@ -249,7 +249,7 @@ document.addEventListener('visibilitychange', () => { if (document.hidden && sta
 function bindOption(id, key, fmt = (v) => v) {
   const el = $(id), out = el.parentElement.querySelector('output');
   const apply = () => {
-    let v = el.type === 'checkbox' ? el.checked : el.type === 'range' ? +el.value : +el.value;
+    let v = el.type === 'checkbox' ? el.checked : el.value === 'auto' ? 'auto' : +el.value;
     save.opts[key] = v; if (out) out.textContent = fmt(v);
     applyOptions(); persist();
   };
@@ -281,6 +281,7 @@ if ('serviceWorker' in navigator && location.protocol !== 'file:') {
 }
 
 // ——— Rendu de l'arme ———
+const weaponBuf = Object.assign(document.createElement('canvas'), { width: 160, height: 120 });
 function drawWeapon(ctx, w, h) {
   const p = game.player, wp = WEAPONS[p.cur];
   const frames = assets.sprites.weapon[wp.id];
@@ -290,12 +291,22 @@ function drawWeapon(ctx, w, h) {
   const by = Math.abs(Math.sin(p.bob)) * h * 0.03 * Math.min(1, p.moving);
   const sw = p.switchAnim > 0 ? (p.switchAnim / 0.25) * wh * 0.6 : 0;
   const dead = p.dead ? Math.min(1, p.deadT) * wh : 0;
+  // L'arme est assombrie selon la lumière reçue (ambiance + lampe).
+  const L = game.lighting();
+  const lum = Math.max(0.12, Math.min(1, L.ambient + L.flash * 0.8));
+  let src = img;
+  if (lum < 0.98) {
+    const g = weaponBuf.getContext('2d');
+    g.globalCompositeOperation = 'copy'; g.drawImage(img, 0, 0);
+    g.globalCompositeOperation = 'source-atop'; g.fillStyle = `rgba(0,0,0,${1 - lum})`; g.fillRect(0, 0, 160, 120);
+    src = weaponBuf;
+  }
   ctx.imageSmoothingEnabled = false;
-  ctx.drawImage(img, Math.round(w / 2 - ww / 2 + bx), Math.round(h - wh + by + sw + dead + h * 0.02), Math.round(ww), Math.round(wh));
+  ctx.drawImage(src, Math.round(w / 2 - ww / 2 + bx), Math.round(h - wh + by + sw + dead + h * 0.02), Math.round(ww), Math.round(wh));
 }
 
 // ——— HUD ———
-const H = { health: $('#h-health'), armor: $('#h-armor'), ammo: $('#h-ammo'), wname: $('#h-wname'), score: $('#h-score'), kb: $('#k-blue'), kr: $('#k-red'), bossbar: $('#bossbar'), bossfill: $('#bossbar i') };
+const H = { bat: $('#h-bat'), health: $('#h-health'), armor: $('#h-armor'), ammo: $('#h-ammo'), wname: $('#h-wname'), score: $('#h-score'), kb: $('#k-blue'), kr: $('#k-red'), bossbar: $('#bossbar'), bossfill: $('#bossbar i') };
 const last = {};
 function setText(el, key, v) { if (last[key] !== v) { last[key] = v; el.textContent = v; } }
 function updateHud() {
@@ -307,6 +318,10 @@ function updateHud() {
   setText(H.ammo, 'am', wp.ammo ? p[wp.ammo] : '∞');
   H.ammo.classList.toggle('low', !!wp.ammo && p[wp.ammo] < wp.cost * 5);
   setText(H.score, 's', p.score.toLocaleString('fr-FR'));
+  const bat = Math.ceil(p.battery);
+  if (last.bat !== bat) { last.bat = bat; H.bat.style.width = bat + '%'; }
+  H.bat.classList.toggle('low', p.battery < 20);
+  H.bat.classList.toggle('off', !p.lamp);
   H.kb.classList.toggle('on', p.keys.blue);
   H.kr.classList.toggle('on', p.keys.red);
   const b = game.boss;
@@ -393,9 +408,19 @@ function startAttract(levelIndex = 0) {
 }
 
 // ——— Résolution ———
+// Résolution interne : fixe, ou adaptée en continu pour tenir ~60 i/s.
+const AUTO_STEPS = [160, 200, 240, 300, 360];
+let autoQ = isTouch ? 2 : 3, frameAvg = 1 / 60, lastQChange = 0;
+function adaptQuality(dt, now) {
+  if (save.opts.quality !== 'auto' || state !== 'play') return;
+  frameAvg = frameAvg * 0.95 + dt * 0.05;
+  if (now - lastQChange < 1500) return;
+  if (frameAvg > 1 / 48 && autoQ > 0) { autoQ--; lastQChange = now; resize(); }
+  else if (frameAvg < 1 / 58 && autoQ < AUTO_STEPS.length - 1 && now - lastQChange > 8000) { autoQ++; lastQChange = now; resize(); }
+}
 function resize() {
   const dpr = 1;
-  const hTarget = save.opts.quality;
+  const hTarget = save.opts.quality === 'auto' ? AUTO_STEPS[autoQ] : save.opts.quality;
   const aspect = innerWidth / innerHeight;
   renderer.resize(Math.round(hTarget * aspect * dpr), hTarget * dpr);
   const s = Math.min(2, devicePixelRatio || 1);
@@ -409,6 +434,7 @@ let lastT = performance.now();
 function frame(t) {
   requestAnimationFrame(frame);
   const dt = Math.min(0.05, (t - lastT) / 1000);
+  adaptQuality((t - lastT) / 1000, t);
   lastT = t;
   if (state === 'play' && game) {
     const inp = input.poll(dt);

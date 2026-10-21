@@ -54,7 +54,7 @@ export class Game {
       x: world.start.x, y: world.start.y, a: level.angle || 0,
       ...inv, keys: { blue: false, red: false },
       cooldown: 0, fireAnim: 0, switchAnim: 0, bob: 0, bobY: 0, moving: 0, dead: false, deadT: 0, stepAcc: 0,
-      hurtDir: 0,
+      hurtDir: 0, lamp: true, battery: inv.battery ?? 100,
     };
     this.enemies = []; this.items = []; this.decor = []; this.projectiles = []; this.effects = [];
     // killIds / secretIds : événements bruts envoyés au serveur pour recalculer le score.
@@ -87,7 +87,29 @@ export class Game {
 
   inventory() {
     const p = this.player;
-    return { health: p.health, armor: p.armor, cells: p.cells, shells: p.shells, weapons: [...p.weapons], cur: p.cur, score: p.score };
+    return { health: p.health, armor: p.armor, cells: p.cells, shells: p.shells, weapons: [...p.weapons], cur: p.cur, score: p.score, battery: p.battery };
+  }
+
+  // Éclairage de l'image courante : ambiance vacillante, lampe, brouillard.
+  lighting() {
+    const lv = this.level, t = this.time, p = this.player;
+    let flick = 1;
+    if (lv.flicker) {
+      const n = Math.sin(t * 13.1) * Math.sin(t * 7.3 + 1.7) * Math.sin(t * 2.3 + 0.4);
+      if (n > 0.45) flick = 1 - lv.flicker * Math.min(1, (n - 0.45) / 0.3);
+    }
+    const ambient = (lv.ambient ?? lv.light ?? 1) * flick + this.flash * 0.45;
+    let flash = 0;
+    if (p.lamp && p.battery > 0 && !p.dead) {
+      const L = CONFIG.lamp;
+      flash = (lv.lampPower ?? (lv.ambient != null ? L.power : 0));
+      if (p.battery < L.lowWarn) {
+        flash *= 0.45 + (0.55 * p.battery) / L.lowWarn;
+        if (Math.sin(t * 31) * Math.sin(t * 17.3) > 0.82) flash *= 0.15; // la lampe grésille
+      }
+    }
+    const emissive = lv.flicker ? 0.82 + 0.18 * Math.sin(t * 9.7) * Math.sin(t * 4.1 + 2) : 1;
+    return { ambient, flash, emissive, fog: lv.fog, fogDist: (lv.fogDist ?? 11) * (1 + this.flash * 0.5) };
   }
 
   // ——— Boucle de mise à jour ———
@@ -144,6 +166,13 @@ export class Game {
     if (input.weapon != null) this.selectWeapon(input.weapon);
     if (input.nextWeapon) this.cycleWeapon(input.nextWeapon);
     if (input.use) this.use();
+    if (input.lamp) { p.lamp = !p.lamp; audio.play('click'); }
+    if (p.lamp && p.battery > 0) {
+      const before = p.battery;
+      p.battery = Math.max(0, p.battery - (dt * 100) / (CONFIG.lamp.seconds * this.diff.battery));
+      if (before >= CONFIG.lamp.lowWarn && p.battery < CONFIG.lamp.lowWarn) this.ui.message('Batterie de la lampe faible', 'red');
+      if (before > 0 && p.battery === 0) this.ui.message('Lampe éteinte — trouvez des piles', 'red');
+    }
     const wpn = this.weapon;
     if (input.fire && p.cooldown <= 0 && p.switchAnim <= 0 && (input.firePressed || wpn.auto)) this.fire();
     this.pickups();
@@ -408,6 +437,7 @@ export class Game {
       case 'k': p.keys.blue = true; ui.message('Carte d\'accès BLEUE', 'blue'); audio.play('key'); ui.flash('pick'); return true;
       case 'K': p.keys.red = true; ui.message('Carte d\'accès ROUGE', 'red'); audio.play('key'); ui.flash('pick'); return true;
       case 't': p.score += 500; this.stats.items++; ui.message('Cristal de données +500'); audio.play('treasure'); ui.flash('pick'); return true;
+      case 'b': if (p.battery >= 100) return false; p.battery = Math.min(100, p.battery + CONFIG.lamp.pickup); ui.message(`Piles +${CONFIG.lamp.pickup} %`); audio.play('pickup'); ui.flash('pick'); return true;
       case 'w': return weapon(2, 'cells', 30);
       case 'W': return weapon(3, 'shells', 12);
       case 'Z': return weapon(4, 'cells', 40);
@@ -590,7 +620,7 @@ export class Game {
       else if (e.state === 'pain') spr = f.pain;
       else if (e.state === 'chase' && e.moved !== false) spr = f.walk[Math.floor(e.anim * 4) & 1];
       else spr = f.walk[e.t === 'g' || e.t === 'O' ? Math.floor(e.anim * 2) & 1 : 0];
-      out.push({ x: e.x, y: e.y, spr, scale: e.d.scale || 1, hurt: e.hurtT > 0 && e.state !== 'dead' });
+      out.push({ x: e.x, y: e.y, spr, scale: e.d.scale || 1, hurt: e.hurtT > 0 && e.state !== 'dead', ghost: e.d.ghost && e.state !== 'dead' ? 1 : 0 });
     }
     for (const pr of this.projectiles) out.push({ x: pr.x, y: pr.y, spr: S.misc[pr.kind], z: pr.z - 0.2, scale: pr.kind === 'orb' ? 0.9 : 0.6, bright: true });
     for (const f of this.effects) {

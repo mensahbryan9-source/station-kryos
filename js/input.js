@@ -7,7 +7,7 @@ export class Input {
     this.keys = new Set();
     this.mouseDX = 0;
     this.mouseDown = false;
-    this.edges = { use: false, fire: false, weapon: null, next: 0 };
+    this.edges = { use: false, fire: false, weapon: null, next: 0, lamp: false };
     this.sensitivity = 1;
     this.enabled = false;
     this.touch = { move: null, look: null, fire: false, lookDX: 0, mx: 0, my: 0 };
@@ -18,6 +18,7 @@ export class Input {
       this.keys.add(e.code);
       if (!this.enabled) return;
       if (e.code === 'Space' || e.code === 'KeyE' || e.code === 'Enter') this.edges.use = true;
+      if (e.code === 'KeyF') this.edges.lamp = true;
       if (/^Digit[1-5]$/.test(e.code)) this.edges.weapon = +e.code[5] - 1;
       if (e.code === 'ControlLeft' || e.code === 'ControlRight') this.edges.fire = true;
       if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Tab'].includes(e.code)) e.preventDefault();
@@ -73,6 +74,7 @@ export class Input {
     }, { passive: false });
     btn('.b-use', () => { this.edges.use = true; });
     btn('.b-next', () => { this.edges.next = 1; });
+    btn('.b-lamp', () => { this.edges.lamp = true; });
     btn('.b-map', () => this.onAction('map'));
     btn('.b-pause', () => this.onAction('pause'));
 
@@ -136,7 +138,7 @@ export class Input {
     turn += T.lookDX * 0.0065 * this.sensitivity; T.lookDX = 0;
     let fire = this.mouseDown || has('ControlLeft', 'ControlRight') || T.fire;
     let firePressed = this.edges.fire;
-    const out = { forward: 0, strafe: 0, turn, run: has('ShiftLeft', 'ShiftRight'), fire, firePressed, use: this.edges.use, weapon: this.edges.weapon, nextWeapon: this.edges.next };
+    const out = { forward: 0, strafe: 0, turn, run: has('ShiftLeft', 'ShiftRight'), fire, firePressed, use: this.edges.use, weapon: this.edges.weapon, nextWeapon: this.edges.next, lamp: this.edges.lamp };
     // manette
     const g = this.gamepad();
     if (g) {
@@ -148,6 +150,7 @@ export class Input {
       const edge = (i) => pressed(i) && !prev[i];
       if (pressed(7) || pressed(6)) { out.fire = true; if (edge(7) || edge(6)) out.firePressed = true; }
       if (edge(0) || edge(2)) out.use = true;
+      if (edge(3)) out.lamp = true;
       if (edge(5)) out.nextWeapon = 1;
       if (edge(4)) out.nextWeapon = -1;
       if (edge(9)) this.onAction('pause');
@@ -157,7 +160,7 @@ export class Input {
     }
     out.forward = Math.max(-1, Math.min(1, forward));
     out.strafe = Math.max(-1, Math.min(1, strafe));
-    this.edges = { use: false, fire: false, weapon: null, next: 0 };
+    this.edges = { use: false, fire: false, weapon: null, next: 0, lamp: false };
     return out;
   }
 }
