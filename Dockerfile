@@ -1,9 +1,9 @@
 FROM nginx:1.27-alpine
-LABEL org.opencontainers.image.title="Station Kryos" \
-      org.opencontainers.image.description="FPS rétro en raycasting (PWA)" \
+LABEL org.opencontainers.image.title="Le Manoir des Ombres" \
+      org.opencontainers.image.description="FPS Halloween en raycasting (PWA) — concours BDE Epitech Bénin" \
       org.opencontainers.image.licenses="MIT"
 COPY nginx.conf /etc/nginx/conf.d/default.conf
-COPY index.html manifest.webmanifest sw.js /usr/share/nginx/html/
+COPY index.html admin.html manifest.webmanifest sw.js /usr/share/nginx/html/
 COPY css /usr/share/nginx/html/css
 COPY js /usr/share/nginx/html/js
 COPY icons /usr/share/nginx/html/icons

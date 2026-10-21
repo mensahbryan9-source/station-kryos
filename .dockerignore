@@ -3,3 +3,6 @@
 tools
 node_modules
 *.md
+supabase
+tests
+package*.json

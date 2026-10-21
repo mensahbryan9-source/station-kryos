@@ -1,0 +1,11 @@
+# Option d'auto-hébergement du jeu (front) : non nécessaire pour le concours,
+# qui tourne sur GitHub Pages + Supabase. Le backend reste celui de Supabase
+# (URL dans js/config.js → CONFIG.api.url).
+#   docker compose up -d   →   http://localhost:8080
+services:
+  web:
+    build: .
+    image: ghcr.io/mensahbryan9-source/station-kryos:latest
+    ports:
+      - "8080:80"
+    restart: unless-stopped

@@ -1,9 +1,17 @@
-# STATION KRYOS
+# LE MANOIR DES OMBRES
 
-FPS rétro en **raycasting**, dans l'esprit des pionniers du genre, avec un univers et des visuels 100 % originaux.
+FPS d'Halloween en **raycasting** — jeu-concours de la **Soirée Halloween du BDE Epitech Bénin** (31 octobre).
 Tout (textures, sprites, armes, sons, musique, icônes) est **généré par le code** : aucune ressource externe.
 
 ▶ **Jouer en ligne : https://mensahbryan9-source.github.io/station-kryos/**
+
+- 5 niveaux (cimetière → catacombes → crypte → jardins → manoir hanté), 2 boss, 4 difficultés
+- Lampe torche à batterie, brouillard, lumières vacillantes, fantômes translucides, jump scares
+- Concours : inscription, score recalculé et validé côté serveur (Supabase), classement, page admin
+- Barème et règles : `js/config.js` · Déploiement : [DEPLOIEMENT.md](DEPLOIEMENT.md)
+
+> Le projet est né sous le nom *Station Kryos* (FPS de science-fiction) ; ce thème reste
+> présent dans le code (textures, sprites, bestiaire) mais n'est plus utilisé.
 
 ## L'histoire
 
