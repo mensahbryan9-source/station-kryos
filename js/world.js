@@ -21,6 +21,7 @@ export class World {
     this.texIndex = texIndex;
     this.exitOn = false;
     this.totalSecrets = 0;
+    this.secretIds = new Map(); // cellule → rang du secret (ordre de lecture de la carte)
     this.flow = new Int16Array(N);
     this.flowCell = -1; this.flowTimer = 0;
 
@@ -33,7 +34,8 @@ export class World {
         const name = v ? v[(((x * 73856093) ^ (y * 19349663)) >>> 0) % v.length] : WALL_CHARS[c];
         this.tex[i] = texIndex[name];
       } else if (c === '*') {
-        this.type[i] = PUSH; this.tex[i] = texIndex[def.secretTex]; this.totalSecrets++;
+        this.type[i] = PUSH; this.tex[i] = texIndex[def.secretTex];
+        this.secretIds.set(i, this.totalSecrets++);
       } else if (c === 'D' || c === 'B' || c === 'R') {
         this.type[i] = DOOR;
         this.tex[i] = texIndex[c === 'B' ? 'doorBlue' : c === 'R' ? 'doorRed' : 'door'];

@@ -1,6 +1,8 @@
 // Logique de jeu : joueur, armes, ennemis, projectiles, objets, effets.
 import { World, DOOR, PUSH, EXIT, EMPTY } from './world.js';
 import { audio } from './audio.js';
+import { CONFIG } from './config.js';
+import { levelManifest } from './scoring.js';
 
 export const WEAPONS = [
   { id: 'blade', name: 'Lame à arc', ammo: null, dmg: [28, 42], rate: 0.42, melee: true, auto: true, sound: 'blade', key: '1' },
@@ -17,11 +19,10 @@ const ENEMY = {
   m: { name: 'Broyeur', hp: 150, speed: 2.7, r: 0.38, sight: 12, range: 1.15, cd: [0.8, 1.1], points: 400, pain: 0.25, kind: 'melee', dmg: [14, 24] },
   O: { name: "L'Archonte", hp: 2000, speed: 1.05, r: 0.75, sight: 30, range: 22, cd: [1.4, 2.2], points: 5000, pain: 0.04, kind: 'boss', proj: 'orb', pdmg: [14, 22], pspeed: 5.2, scale: 1.9 },
 };
-export const DIFFICULTY = [
-  { name: 'Recrue', dmg: 0.5, hp: 0.8, cd: 1.3 },
-  { name: 'Vétéran', dmg: 1, hp: 1, cd: 1 },
-  { name: 'Cauchemar', dmg: 1.45, hp: 1.25, cd: 0.8 },
-];
+// Réglages de jeu par difficulté, issus de la config centrale.
+export const DIFFICULTY = CONFIG.difficulties.map((d) => ({
+  name: d.name, dmg: d.enemyDmg, hp: d.enemyHp, cd: d.enemyCooldown, speed: d.enemySpeed, battery: d.battery, tier: d.spawnTier,
+}));
 
 const rnd = (a, b) => a + Math.random() * (b - a);
 const angDiff = (a, b) => { let d = a - b; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI; return d; };
@@ -56,18 +57,23 @@ export class Game {
       hurtDir: 0,
     };
     this.enemies = []; this.items = []; this.decor = []; this.projectiles = []; this.effects = [];
-    this.stats = { kills: 0, totalKills: 0, items: 0, totalItems: 0, secrets: 0, totalSecrets: world.totalSecrets };
+    // killIds / secretIds : événements bruts envoyés au serveur pour recalculer le score.
+    this.stats = { kills: 0, totalKills: 0, items: 0, totalItems: 0, secrets: 0, totalSecrets: world.totalSecrets, killIds: [], secretIds: [] };
+    // Les ennemis viennent du manifeste partagé avec le serveur (identifiants et paliers de difficulté).
+    for (const m of levelManifest(level, difficulty).present) {
+      const d = ENEMY[m.type];
+      if (!d) continue;
+      this.enemies.push({
+        id: m.id, t: m.type, d, x: m.x + 0.5, y: m.y + 0.5, a: Math.random() * 6.28, hp: d.hp * this.diff.hp,
+        state: 'idle', timer: 0, anim: 0, cd: rnd(0.4, 1.2), react: 0, summon: 10, moved: 0,
+        spr: assets.sprites.enemy[m.type],
+      });
+      this.stats.totalKills++;
+    }
     for (const s of world.spawns) {
       const c = s.ch;
-      if (ENEMY[c]) {
-        const d = ENEMY[c];
-        this.enemies.push({
-          t: c, d, x: s.x, y: s.y, a: Math.random() * 6.28, hp: d.hp * this.diff.hp,
-          state: 'idle', timer: 0, anim: 0, cd: rnd(0.4, 1.2), react: 0, summon: 10, moved: 0,
-          spr: assets.sprites.enemy[c],
-        });
-        this.stats.totalKills++;
-      } else if ('hHrackKtwWZ'.includes(c)) {
+      if (ENEMY[c] || '234'.includes(c)) continue;
+      if ('hHrackKtwWZ'.includes(c)) {
         this.items.push({ t: c, x: s.x, y: s.y, spr: assets.sprites.item[c] });
         if (c === 't') this.stats.totalItems++;
       } else if (assets.sprites.decor[c]) {
@@ -255,6 +261,7 @@ export class Game {
     if (e.hp <= 0) {
       e.state = 'dying'; e.timer = 0;
       this.stats.kills++; this.player.score += e.d.points;
+      if (e.id != null) this.stats.killIds.push(e.id);
       audio.play('die_' + e.t, e);
       if (e.t === 'g') this.effect('boom', e.x, e.y, 0.5, 0.2);
       if (e.t === 'O') {
@@ -337,8 +344,10 @@ export class Game {
     } else if (t === PUSH) {
       const dx = Math.abs(Math.cos(p.a)) > Math.abs(Math.sin(p.a)) ? Math.sign(Math.cos(p.a)) : 0;
       const dy = dx ? 0 : Math.sign(Math.sin(p.a));
+      const secretId = w.secretIds.get(w.idx(tx, ty));
       if (w.push(tx, ty, dx, dy)) {
         this.stats.secrets++;
+        this.stats.secretIds.push(secretId);
         audio.play('push', { x: tx + 0.5, y: ty + 0.5 }); audio.play('secret');
         this.ui.message('Passage secret découvert !', 'secret');
       }
@@ -474,7 +483,7 @@ export class Game {
     }
     const mx = tx - e.x, my = ty - e.y, ml = Math.hypot(mx, my);
     if (ml < 0.01) return;
-    const sp = d.speed * dt * (e.t === 'm' && e.sees ? 1.25 : 1);
+    const sp = d.speed * this.diff.speed * dt * (e.t === 'm' && e.sees ? 1.25 : 1);
     const vx = (mx / ml) * sp, vy = (my / ml) * sp;
     e.a = Math.atan2(my, mx);
     let movedAny = false;
