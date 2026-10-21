@@ -1,0 +1,5 @@
+.git
+.github
+tools
+node_modules
+*.md

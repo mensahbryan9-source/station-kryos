@@ -1,0 +1,13 @@
+{
+  "name": "station-kryos",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "FPS rétro en raycasting, jouable au clavier/souris et au tactile, installable en PWA.",
+  "scripts": {
+    "validate": "node tools/validate-levels.mjs",
+    "icons": "node tools/make-icons.mjs",
+    "serve": "python3 -m http.server 8080"
+  },
+  "license": "MIT"
+}

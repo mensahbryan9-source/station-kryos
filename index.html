@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <title>Station Kryos</title>
+  <meta name="description" content="Station Kryos — FPS rétro en raycasting. Infiltrez une station minière corrompue et détruisez l'Archonte.">
+  <meta name="theme-color" content="#05080d">
+  <meta name="color-scheme" content="dark">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Kryos">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="icons/icon-192.png" sizes="192x192" type="image/png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="app">
+  <canvas id="view" aria-label="Vue du jeu"></canvas>
+  <div id="vignette"></div>
+  <div id="flash"></div>
+  <div id="hurtdir"></div>
+  <div id="crosshair"></div>
+  <canvas id="minimap" width="160" height="160"></canvas>
+  <div id="messages" aria-live="polite"></div>
+  <div id="bossbar" hidden><span>L'ARCHONTE</span><div><i></i></div></div>
+
+  <div id="hud" hidden>
+    <div class="cell"><label>SANTÉ</label><b id="h-health">100</b></div>
+    <div class="cell"><label>ARMURE</label><b id="h-armor">0</b></div>
+    <div class="cell monitor"><canvas id="ecg" width="120" height="40"></canvas></div>
+    <div class="cell wide"><label id="h-wname">PISTOLET</label><b id="h-ammo">40</b></div>
+    <div class="cell keys"><label>CARTES</label><span><i id="k-blue"></i><i id="k-red"></i></span></div>
+    <div class="cell"><label>SCORE</label><b id="h-score">0</b></div>
+    <div class="cell"><label>SECTEUR</label><b id="h-level">1</b></div>
+  </div>
+
+  <div id="touch" hidden>
+    <div class="touch-zone"></div>
+    <div class="stick"><div class="knob"></div></div>
+    <button class="tb b-pause" aria-label="Pause">❚❚</button>
+    <button class="tb b-map" aria-label="Carte">▦</button>
+    <button class="tb b-next" aria-label="Arme suivante">⟳</button>
+    <button class="tb b-use" aria-label="Utiliser">USE</button>
+    <button class="tb b-fire" aria-label="Tirer">FEU</button>
+  </div>
+
+  <div id="fullmap" hidden><canvas width="720" height="600"></canvas><p>Carte du secteur — <kbd>Tab</kbd> / <kbd>M</kbd> pour fermer</p></div>
+
+  <!-- Écrans -->
+  <section class="screen" id="s-title">
+    <div class="logo">
+      <small>UNE MISSION EN 3 SECTEURS</small>
+      <h1>STATION<br><span>KRYOS</span></h1>
+    </div>
+    <nav>
+      <button data-go="difficulty" class="primary">Nouvelle partie</button>
+      <button data-go="levels">Choisir un secteur</button>
+      <button data-go="options">Options</button>
+      <button data-go="help">Commandes</button>
+      <button id="install" hidden>Installer l'application</button>
+    </nav>
+    <p class="foot" id="best"></p>
+  </section>
+
+  <section class="screen" id="s-difficulty" hidden>
+    <h2>Difficulté</h2>
+    <nav>
+      <button data-diff="0">Recrue <em>dégâts réduits</em></button>
+      <button data-diff="1" class="primary">Vétéran <em>l'expérience prévue</em></button>
+      <button data-diff="2">Cauchemar <em>pour les survivants</em></button>
+      <button data-go="title" class="back">Retour</button>
+    </nav>
+  </section>
+
+  <section class="screen" id="s-levels" hidden>
+    <h2>Secteurs</h2>
+    <nav id="level-list"></nav>
+    <nav><button data-go="title" class="back">Retour</button></nav>
+  </section>
+
+  <section class="screen" id="s-options" hidden>
+    <h2>Options</h2>
+    <form class="opts" onsubmit="return false">
+      <label>Sensibilité de visée <input type="range" id="o-sens" min="0.3" max="3" step="0.1"><output></output></label>
+      <label>Champ de vision <input type="range" id="o-fov" min="55" max="95" step="1"><output></output></label>
+      <label>Effets sonores <input type="range" id="o-sfx" min="0" max="1" step="0.05"><output></output></label>
+      <label>Musique <input type="range" id="o-music" min="0" max="1" step="0.05"><output></output></label>
+      <label>Qualité d'image
+        <select id="o-quality">
+          <option value="180">Rétro (180p)</option>
+          <option value="270">Moyenne (270p)</option>
+          <option value="360">Haute (360p)</option>
+          <option value="480">Ultra (480p)</option>
+        </select>
+      </label>
+      <label class="check"><input type="checkbox" id="o-minimap"> Mini-carte</label>
+      <label class="check"><input type="checkbox" id="o-touch"> Commandes tactiles</label>
+    </form>
+    <nav><button data-back class="back">Retour</button></nav>
+  </section>
+
+  <section class="screen" id="s-help" hidden>
+    <h2>Commandes</h2>
+    <div class="help">
+      <div>
+        <h3>Clavier + souris</h3>
+        <ul>
+          <li><kbd>Z Q S D</kbd> / <kbd>W A S D</kbd> / flèches — se déplacer</li>
+          <li><kbd>Souris</kbd> — viser · <kbd>Clic gauche</kbd> / <kbd>Ctrl</kbd> — tirer</li>
+          <li><kbd>Espace</kbd> / <kbd>E</kbd> / <kbd>Clic droit</kbd> — ouvrir, pousser, activer</li>
+          <li><kbd>1</kbd>…<kbd>5</kbd> / <kbd>Molette</kbd> — changer d'arme</li>
+          <li><kbd>Maj</kbd> — courir · <kbd>Alt</kbd> + flèches — pas latéral</li>
+          <li><kbd>Tab</kbd> / <kbd>M</kbd> — carte · <kbd>Échap</kbd> / <kbd>P</kbd> — pause</li>
+        </ul>
+      </div>
+      <div>
+        <h3>Écran tactile</h3>
+        <ul>
+          <li>Pouce gauche — joystick de déplacement</li>
+          <li>Glisser à droite — tourner la vue</li>
+          <li><b>FEU</b> — maintenir pour tirer (glisser pour viser)</li>
+          <li><b>USE</b> — ouvrir / activer · <b>⟳</b> — arme suivante</li>
+        </ul>
+        <h3>Manette</h3>
+        <ul><li>Sticks — bouger / viser · <b>RT</b> tirer · <b>A</b> utiliser · <b>LB/RB</b> armes · <b>Start</b> pause</li></ul>
+      </div>
+    </div>
+    <p class="tip">Astuce : certains murs sonnent creux… Poussez-les.</p>
+    <nav><button data-back class="back">Retour</button></nav>
+  </section>
+
+  <section class="screen" id="s-brief" hidden>
+    <small id="b-sub"></small>
+    <h2 id="b-name"></h2>
+    <p id="b-text" class="brief"></p>
+    <nav><button id="b-go" class="primary">Entrer dans le secteur</button></nav>
+  </section>
+
+  <section class="screen" id="s-pause" hidden>
+    <h2>Pause</h2>
+    <nav>
+      <button id="p-resume" class="primary">Reprendre</button>
+      <button data-go="options">Options</button>
+      <button data-go="help">Commandes</button>
+      <button id="p-restart">Recommencer le secteur</button>
+      <button id="p-quit">Menu principal</button>
+    </nav>
+  </section>
+
+  <section class="screen" id="s-inter" hidden>
+    <small>SECTEUR TERMINÉ</small>
+    <h2 id="i-name"></h2>
+    <table class="stats">
+      <tr><td>Hostiles neutralisés</td><td id="i-kills"></td></tr>
+      <tr><td>Cristaux récupérés</td><td id="i-items"></td></tr>
+      <tr><td>Secrets découverts</td><td id="i-secrets"></td></tr>
+      <tr><td>Temps</td><td id="i-time"></td></tr>
+      <tr><td>Score</td><td id="i-score"></td></tr>
+    </table>
+    <nav><button id="i-next" class="primary">Continuer</button></nav>
+  </section>
+
+  <section class="screen" id="s-dead" hidden>
+    <h2 class="red">SIGNAL PERDU</h2>
+    <p>Vos constantes vitales sont à zéro.</p>
+    <nav>
+      <button id="d-retry" class="primary">Réessayer le secteur</button>
+      <button id="d-quit">Menu principal</button>
+    </nav>
+  </section>
+
+  <section class="screen" id="s-victory" hidden>
+    <small>MISSION ACCOMPLIE</small>
+    <h2>KRYOS EST LIBÉRÉE</h2>
+    <p class="brief">L'Archonte n'est plus qu'un amas de circuits fondus. Les systèmes de la station redémarrent un à un pendant que votre navette se détache du quai. Dans le silence de l'espace, un dernier signal clignote sur votre console… mais c'est une autre histoire.</p>
+    <table class="stats">
+      <tr><td>Score final</td><td id="v-score"></td></tr>
+      <tr><td>Temps total</td><td id="v-time"></td></tr>
+      <tr><td>Difficulté</td><td id="v-diff"></td></tr>
+    </table>
+    <nav><button id="v-menu" class="primary">Retour au menu</button></nav>
+  </section>
+
+  <div id="rotate"><div>⟲</div><p>Tournez votre téléphone en mode paysage</p></div>
+  <div id="loading"><p>Initialisation des systèmes…</p></div>
+</div>
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
