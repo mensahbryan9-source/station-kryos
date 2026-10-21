@@ -61,17 +61,47 @@
       <p class="event">🎃 Jeu-concours de la <b>Soirée Halloween du BDE Epitech Bénin</b> — samedi 31 octobre</p>
     </div>
     <nav>
-      <button data-go="difficulty" class="primary">Nouvelle partie</button>
-      <button data-go="levels">Choisir un niveau</button>
+      <button id="play" class="primary">Jouer au concours</button>
+      <button data-go="levels">Entraînement libre</button>
+      <button id="btn-board">Classement</button>
       <button data-go="options">Options</button>
       <button data-go="help">Commandes</button>
       <button id="install" hidden>Installer l'application</button>
     </nav>
+    <p class="countdown" id="countdown"></p>
+    <p class="foot" id="whoami"></p>
     <p class="foot" id="best"></p>
+  </section>
+
+  <section class="screen" id="s-register" hidden>
+    <h2>Inscription au concours</h2>
+    <p class="note">Un seul gagnant : le meilleur score à la fin du concours. <b>Seul votre pseudo est affiché publiquement</b> ; vos nom et contact servent uniquement à vous remettre le lot.</p>
+    <form id="reg-form" class="opts reg" novalidate>
+      <label>Pseudo (public) <input name="pseudo" required minlength="3" maxlength="16" autocomplete="nickname" placeholder="3 à 16 caractères"></label>
+      <label>Prénom <input name="firstName" required maxlength="60" autocomplete="given-name"></label>
+      <label>Nom <input name="lastName" required maxlength="60" autocomplete="family-name"></label>
+      <label>Email ou téléphone <input name="contact" required maxlength="120" autocomplete="email" placeholder="vous@exemple.com ou 01 97 00 00 00"></label>
+      <label class="check consent"><input type="checkbox" name="consent" required> Mes données servent uniquement au concours et seront supprimées après la remise du lot.</label>
+      <p class="err" id="reg-err" role="alert"></p>
+      <nav><button type="submit" class="primary" id="reg-submit">S'inscrire et jouer</button><button type="button" data-back class="back">Retour</button></nav>
+    </form>
+    <p class="foot">Déjà inscrit sur un autre appareil ? Saisissez exactement les mêmes informations.</p>
+  </section>
+
+  <section class="screen" id="s-board" hidden>
+    <small id="board-status">CLASSEMENT DU CONCOURS</small>
+    <h2>Top 20</h2>
+    <p class="countdown" id="board-countdown"></p>
+    <table class="stats board" id="board-table"></table>
+    <p class="foot" id="board-me"></p>
+    <nav><button id="board-refresh">Actualiser</button><button data-back class="back">Retour</button></nav>
   </section>
 
   <section class="screen" id="s-difficulty" hidden>
     <h2>Difficulté</h2>
+    <p class="note" id="diff-note"></p>
+    <p class="err" id="diff-err" role="alert"></p>
+    <nav id="diff-offline" hidden><button id="diff-practice">Jouer quand même (hors concours)</button></nav>
     <nav>
       <button data-diff="0">Facile <em>score ×1,0</em></button>
       <button data-diff="1" class="primary">Normal <em>score ×1,5</em></button>
@@ -167,8 +197,8 @@
       <tr><td>Crânes d'or récupérés</td><td id="i-items"></td></tr>
       <tr><td>Secrets découverts</td><td id="i-secrets"></td></tr>
       <tr><td>Temps</td><td id="i-time"></td></tr>
-      <tr><td>Score</td><td id="i-score"></td></tr>
     </table>
+    <div id="i-breakdown" class="breakdown"></div>
     <nav><button id="i-next" class="primary">Continuer</button></nav>
   </section>
 
@@ -185,12 +215,15 @@
     <small>MISSION ACCOMPLIE</small>
     <h2>L'AUBE SE LÈVE</h2>
     <p class="brief">Le Roi Citrouille n'est plus qu'un tas d'écorces fumantes. Les portraits ferment les yeux, les bougies s'éteignent une à une, et le premier rayon de soleil traverse les vitraux. Vous avez survécu à la nuit… Rendez-vous le 31 octobre à la soirée Halloween du BDE Epitech Bénin !</p>
-    <table class="stats">
-      <tr><td>Score final</td><td id="v-score"></td></tr>
-      <tr><td>Temps total</td><td id="v-time"></td></tr>
-      <tr><td>Difficulté</td><td id="v-diff"></td></tr>
-    </table>
-    <nav><button id="v-menu" class="primary">Retour au menu</button></nav>
+    <div id="v-run" class="breakdown"></div>
+    <nav><button id="v-board" class="primary">Voir le classement</button><button id="v-menu">Retour au menu</button></nav>
+  </section>
+
+  <section class="screen" id="s-run" hidden>
+    <small>BILAN DE LA PARTIE</small>
+    <h2>Votre score</h2>
+    <div id="run-body" class="breakdown"></div>
+    <nav><button id="run-board" class="primary">Voir le classement</button><button id="run-menu">Menu principal</button></nav>
   </section>
 
   <div id="rotate"><div>⟲</div><p>Tournez votre téléphone en mode paysage</p></div>

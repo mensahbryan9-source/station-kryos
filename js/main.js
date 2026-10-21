@@ -5,8 +5,10 @@ import { buildSprites } from './sprites.js';
 import { buildHalloweenTextures } from './textures-halloween.js';
 import { buildHalloweenSprites } from './sprites-halloween.js';
 import { CONFIG } from './config.js';
+import { contest, countdown } from './contest.js';
 import { Renderer } from './renderer.js';
 import { Game, WEAPONS, DIFFICULTY, newPlayerState } from './game.js';
+import { scoreLevel } from './scoring.js';
 import { Input } from './input.js';
 import { audio } from './audio.js';
 import { EMPTY, DOOR, MOVING } from './world.js';
@@ -68,7 +70,7 @@ const ui = {
     h.style.transition = 'none'; h.style.transform = `rotate(${rel + Math.PI / 2}rad)`; h.style.opacity = 1;
     requestAnimationFrame(() => { h.style.transition = 'opacity .8s'; h.style.opacity = 0; });
   },
-  died() { setTimeout(() => showScreen('dead'), 50); input.unlock(); audio.stopMusic(); audio.stopAmbience(); state = 'dead'; },
+  died() { if (session) session.deaths++; setTimeout(() => showScreen('dead'), 50); input.unlock(); audio.stopMusic(); audio.stopAmbience(); state = 'dead'; },
   levelComplete(res) { onLevelComplete(res); },
   get scaresEnabled() { return save.opts.scares; },
   scare(kind) {
@@ -122,6 +124,68 @@ document.addEventListener('click', (e) => {
   if (b.dataset.back !== undefined) back();
   if (b.dataset.diff !== undefined) newGame(+b.dataset.diff);
 });
+
+// ——— Concours : inscription, démarrage, classement ———
+$('#play').onclick = () => {
+  if (!contest.configured || !contest.open) return openDifficulty(false);
+  if (!contest.player) return go('register');
+  openDifficulty(true);
+};
+function openDifficulty(ranked) {
+  $('#diff-err').textContent = ''; $('#diff-offline').hidden = true;
+  $('#diff-note').innerHTML = ranked
+    ? `Partie classée pour <b>${escapeHtml(contest.player.pseudo)}</b>. Le coefficient de difficulté multiplie votre score.`
+    : !contest.configured ? 'Serveur du concours non configuré : partie hors concours.'
+    : 'Le concours est terminé : cette partie ne sera pas classée.';
+  pendingRanked = ranked;
+  go('difficulty');
+}
+let pendingRanked = false;
+const escapeHtml = (v) => String(v).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+$('#reg-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const f = e.target, err = $('#reg-err'), btn = $('#reg-submit');
+  const data = Object.fromEntries(new FormData(f));
+  data.consent = f.consent.checked;
+  if (!/^[\p{L}\p{N} _.\-]{3,16}$/u.test((data.pseudo || '').trim())) { err.textContent = 'Pseudo : 3 à 16 caractères (lettres, chiffres, espace, _ . -)'; return; }
+  if (!data.firstName.trim() || !data.lastName.trim()) { err.textContent = 'Le prénom et le nom sont obligatoires.'; return; }
+  if (!data.contact.trim()) { err.textContent = 'Indiquez un email ou un numéro de téléphone.'; return; }
+  if (!data.consent) { err.textContent = 'Vous devez accepter l\'utilisation de vos données pour participer.'; return; }
+  err.textContent = ''; btn.disabled = true; btn.textContent = 'Inscription…';
+  try {
+    const r = await contest.register(data);
+    ui.message(r.returning ? `Bon retour, ${r.pseudo} !` : `Bienvenue, ${r.pseudo} !`, 'secret');
+    screenStack = ['title'];
+    openDifficulty(true);
+  } catch (ex) {
+    err.textContent = ex.status === 0 ? 'Connexion impossible. Vérifiez votre réseau et réessayez.' : ex.message;
+  } finally { btn.disabled = false; btn.textContent = 'S\'inscrire et jouer'; }
+});
+
+$('#btn-board').onclick = () => { go('board'); loadBoard(); };
+$('#board-refresh').onclick = () => loadBoard();
+$('#run-board').onclick = $('#v-board').onclick = () => { toTitle(); go('board'); loadBoard(); };
+$('#run-menu').onclick = () => toTitle();
+
+async function loadBoard() {
+  const t = $('#board-table');
+  t.innerHTML = '<tr><td>Chargement…</td></tr>'; $('#board-me').textContent = '';
+  try {
+    const d = await contest.leaderboard();
+    $('#board-status').textContent = d.frozen ? 'CONCOURS TERMINÉ — CLASSEMENT FIGÉ' : 'CLASSEMENT EN DIRECT';
+    const me = d.me && d.me.pseudo;
+    t.innerHTML = d.top.length
+      ? '<tr><td>#</td><td>Pseudo</td><td>Niveaux</td><td>Difficulté</td><td>Score</td></tr>' + d.top.map((r) => `<tr class="${r.pseudo === me ? 'me' : ''}"><td>${r.rank}</td><td>${escapeHtml(r.pseudo)}</td><td>${r.levels}/5</td><td>${escapeHtml(r.difficulty)}</td><td>${r.score.toLocaleString('fr-FR')}</td></tr>`).join('')
+      : '<tr><td>Aucun score pour l\'instant : soyez le premier !</td></tr>';
+    if (d.me) $('#board-me').textContent = d.me.rank ? `${d.me.pseudo} : ${d.me.rank}${d.me.rank === 1 ? 'er' : 'e'} avec ${d.me.score.toLocaleString('fr-FR')} points` : `${d.me.pseudo} : pas encore de niveau terminé`;
+  } catch (e) {
+    t.innerHTML = `<tr><td>${e.status === 0 ? 'Classement indisponible hors connexion.' : escapeHtml(e.message)}</td></tr>`;
+  }
+}
+
+$('#diff-practice').onclick = () => { pendingRanked = false; newGame(pendingDiff); };
+let pendingDiff = 1;
 document.addEventListener('pointerdown', () => audio.init(), { once: true });
 
 function buildLevelList() {
@@ -134,7 +198,7 @@ function buildLevelList() {
     b.disabled = i >= save.unlocked;
     b.onclick = () => {
       const diff = session ? session.difficulty : 1;
-      session = { difficulty: diff, levelIndex: i, inventory: newPlayerState(L.loadout), totalTime: 0 };
+      session = { difficulty: diff, levelIndex: i, inventory: newPlayerState(L.loadout), totalTime: 0, ranked: false, deaths: 0, played: 0 };
       session.inventory.score = 0;
       brief();
     };
@@ -142,13 +206,26 @@ function buildLevelList() {
   });
 }
 
-function newGame(diff) {
-  session = { difficulty: diff, levelIndex: 0, inventory: newPlayerState(LEVELS[0].loadout), totalTime: 0 };
+async function newGame(diff) {
+  pendingDiff = diff;
+  let ranked = pendingRanked && contest.player && contest.open && contest.configured;
+  if (ranked) {
+    $('#diff-err').textContent = 'Connexion au serveur du concours…';
+    try { await contest.startRun(diff); }
+    catch (e) {
+      $('#diff-err').textContent = e.status === 0 ? 'Serveur injoignable : impossible de démarrer une partie classée.' : e.message;
+      if (e.status === 401) contest.forget();
+      $('#diff-offline').hidden = false;
+      return;
+    }
+  }
+  session = { difficulty: diff, levelIndex: 0, inventory: newPlayerState(LEVELS[0].loadout), totalTime: 0, ranked: !!ranked, deaths: 0, played: 0 };
   brief();
 }
 
 function brief() {
   const L = LEVELS[session.levelIndex];
+  session.deaths = 0;
   $('#b-sub').textContent = L.subtitle.toUpperCase();
   $('#b-name').textContent = L.name;
   $('#b-text').textContent = L.briefing;
@@ -207,11 +284,24 @@ function resume() {
   setPlaying(true);
 }
 $('#p-resume').onclick = resume;
-$('#p-restart').onclick = () => { session.inventory = JSON.parse(JSON.stringify(session.levelStartInv)); startLevel(); };
-$('#p-quit').onclick = () => toTitle();
+// Recommencer volontairement un niveau compte comme une mort (pas de reprise gratuite).
+$('#p-restart').onclick = () => { session.deaths++; session.inventory = JSON.parse(JSON.stringify(session.levelStartInv)); startLevel(); };
+$('#p-quit').onclick = () => quitRun();
 $('#d-retry').onclick = () => { session.inventory = JSON.parse(JSON.stringify(session.levelStartInv)); startLevel(); };
-$('#d-quit').onclick = () => toTitle();
+$('#d-quit').onclick = () => quitRun();
 $('#v-menu').onclick = () => toTitle();
+
+// Quitter une partie classée : les niveaux déjà terminés comptent, on affiche le bilan.
+async function quitRun() {
+  if (!session || !session.ranked || !session.played) {
+    if (session && session.ranked) contest.endRun();
+    return toTitle();
+  }
+  toTitle();
+  showScreen('run');
+  $('#run-body').innerHTML = '<p class="status">Calcul du score final…</p>';
+  renderRun($('#run-body'), await contest.endRun());
+}
 
 function toTitle() {
   game = null; state = 'title';
@@ -241,7 +331,13 @@ function onLevelComplete(res) {
   $('#i-items').textContent = res.items + ' %';
   $('#i-secrets').textContent = res.secrets + ' %';
   $('#i-time').textContent = fmtTime(res.time);
-  $('#i-score').textContent = res.score.toLocaleString('fr-FR');
+  // Événements bruts du niveau : c'est à partir d'eux que le serveur recalcule le score.
+  const events = { kills: [...game.stats.killIds], secrets: [...game.stats.secretIds], hpEnd: Math.max(1, Math.round(game.player.health)), deaths: session.deaths, time: Math.round(res.time * 100) / 100 };
+  session.played++;
+  interLevel = session.levelIndex;
+  if (session.ranked) contest.submitLevel(session.levelIndex, events);
+  else practiceResult = { status: 'practice', local: scoreLevel(LEVELS[session.levelIndex], session.levelIndex, session.difficulty, events) };
+  renderInter();
   audio.muffle(true);
   showScreen('inter');
 }
@@ -251,18 +347,72 @@ $('#i-next').onclick = () => {
   brief();
 };
 
-function victory() {
+async function victory() {
   state = 'victory';
   audio.stopMusic(); audio.stopAmbience();
   audio.play('exit');
-  const score = session.inventory.score;
-  save.best = Math.max(save.best, score); persist();
-  $('#v-score').textContent = score.toLocaleString('fr-FR');
-  $('#v-time').textContent = fmtTime(session.totalTime);
-  $('#v-diff').textContent = DIFFICULTY[session.difficulty].name;
   showScreen('victory');
   startAttract(4);
+  const box = $('#v-run');
+  if (!session.ranked) { box.innerHTML = `<p class="status">Partie d'entraînement en ${escapeHtml(DIFFICULTY[session.difficulty].name)}, terminée en ${fmtTime(session.totalTime)} — non classée.</p>`; return; }
+  box.innerHTML = '<p class="status">Calcul du score final…</p>';
+  const r = await contest.endRun();
+  renderRun(box, r);
+  if (r && !r.offline) { save.best = Math.max(save.best, r.best || 0); persist(); }
 }
+
+// ——— Affichage du détail du score ———
+let interLevel = 0, practiceResult = null;
+const nf = (n) => Math.round(n).toLocaleString('fr-FR');
+function formula(r, level) {
+  const par = CONFIG.levels[level].par;
+  return `<div class="formula">
+    Ennemis +${nf(r.killPoints)} · Secrets +${nf(r.secretPoints)} · PV restants +${nf(r.hpPoints)} · Morts −${nf(r.deathPenalty)}
+    = <b>${nf(r.points)}</b> points<br>
+    × difficulté ${r.diffMult} × temps ${Number(r.timeCoef).toFixed(2)} <span style="color:var(--dim)">(référence ${fmtTime(par)})</span>
+    = <b>${nf(r.score)}</b></div>`;
+}
+function renderInter() {
+  const box = $('#i-breakdown');
+  const r = session.ranked ? contest.result(interLevel) : practiceResult;
+  if (!r) { box.innerHTML = ''; return; }
+  const data = r.server || r.local;
+  const status = {
+    pending: 'Envoi au serveur…',
+    ok: `Score validé par le serveur. Total de la partie : ${nf(r.total ?? 0)}`,
+    offline: 'Hors connexion : résultat en attente, il sera envoyé automatiquement (estimation affichée).',
+    rejected: `Résultat refusé par le serveur : ${escapeHtml(r.error || '')}`,
+    practice: 'Entraînement : score indicatif, non classé.',
+  }[r.status];
+  box.innerHTML = formula(data, interLevel) + `<p class="status ${r.status === 'rejected' ? 'bad' : ''}">${status}</p>`;
+}
+contest.addEventListener('change', () => { if (state === 'inter') renderInter(); updateTitleInfo(); });
+
+function renderRun(box, r) {
+  if (!r) { box.innerHTML = ''; return; }
+  const rows = r.levels.map((l) => `<tr><td>${l.level + 1}. ${escapeHtml(LEVELS[l.level].name)}</td><td>${nf(l.points)}</td><td>×${l.diffMult}</td><td>×${Number(l.timeCoef).toFixed(2)}</td><td>${l.status === 'rejected' ? 'refusé' : nf(l.score)}</td></tr>`).join('');
+  const rank = r.offline
+    ? '<p class="status">Hors connexion : le score sera validé dès le retour du réseau. Consultez ensuite le classement.</p>'
+    : `<p class="rank">${r.isBest ? 'Nouveau record personnel ! ' : ''}Votre rang : <b>${r.rank ?? '—'}${r.rank === 1 ? 'er' : 'e'}</b>${r.isBest ? '' : ` · meilleur score : ${nf(r.best)}`}</p>`;
+  box.innerHTML = `<table><thead><tr><th>Niveau</th><th>Points</th><th>Difficulté</th><th>Temps</th><th>Score</th></tr></thead>
+    <tbody>${rows}</tbody><tfoot><tr><td>Total (${r.levels.length}/5 niveaux)</td><td></td><td></td><td></td><td>${nf(r.total)}</td></tr></tfoot></table>
+    <p class="status">Score d'un niveau = points × coefficient de difficulté × coefficient de temps (entre 0,5 et 2 selon le temps de référence).</p>${rank}`;
+}
+
+// ——— Écran-titre : compte à rebours et joueur connecté ———
+function updateTitleInfo() {
+  const left = new Date(CONFIG.contest.end).getTime() - Date.now();
+  const c = countdown(left);
+  const txt = c ? `⏳ Fin du concours dans ${c}` : '🏁 Concours terminé — classement figé';
+  $('#countdown').textContent = txt; $('#board-countdown').textContent = txt;
+  const who = $('#whoami');
+  if (contest.player) {
+    who.innerHTML = `Joueur : <b>${escapeHtml(contest.player.pseudo)}</b>${contest.pending ? ` · ${contest.pending} résultat(s) en attente d'envoi` : ''} · <a href="#" id="logout">changer</a>`;
+  } else who.textContent = contest.configured ? 'Inscription gratuite avant de jouer — 1 lot à gagner.' : '';
+}
+document.addEventListener('click', (e) => { if (e.target.id === 'logout') { e.preventDefault(); contest.forget(); updateTitleInfo(); } });
+setInterval(updateTitleInfo, 1000);
+updateTitleInfo();
 
 const fmtTime = (t) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}`;
 function updateBest() { $('#best').textContent = save.best ? `Meilleur score : ${save.best.toLocaleString('fr-FR')}` : 'Une nuit. Un manoir. Aucune issue.'; }
@@ -510,4 +660,4 @@ showScreen('title');
 requestAnimationFrame(frame);
 
 // Point d'accès pour les tests automatisés.
-window.__manoir = window.__kryos = { get game() { return game; }, get state() { return state; }, startLevel: (i, d = 1) => { session = { difficulty: d, levelIndex: i, inventory: newPlayerState(LEVELS[i].loadout), totalTime: 0 }; startLevel(); }, LEVELS };
+window.__manoir = window.__kryos = { get game() { return game; }, get state() { return state; }, startLevel: (i, d = 1) => { session = { difficulty: d, levelIndex: i, inventory: newPlayerState(LEVELS[i].loadout), totalTime: 0, ranked: false, deaths: 0, played: 0 }; startLevel(); }, LEVELS, contest, get session() { return session; } };

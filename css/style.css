@@ -94,7 +94,7 @@ button, select, input { font: inherit; color: inherit; }
 #fullmap p { margin: 0; }
 
 /* Écrans */
-.screen { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 24px calc(24px + var(--safe-r)) calc(24px + var(--safe-b)) calc(24px + var(--safe-l));
+.screen { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 14px; padding: 24px calc(24px + var(--safe-r)) calc(24px + var(--safe-b)) calc(24px + var(--safe-l));
   background: radial-gradient(ellipse at 50% 40%, rgba(5, 10, 18, .35), rgba(3, 6, 10, .88) 75%); overflow-y: auto; text-align: center; touch-action: pan-y; }
 #s-title { background: linear-gradient(180deg, rgba(10, 3, 12, .25), rgba(8, 2, 10, .8)); }
 .logo small, .screen > small { font-family: var(--mono); letter-spacing: .4em; color: var(--cyan); font-size: 12px; }
@@ -164,3 +164,45 @@ kbd { font-family: var(--mono); font-size: 12px; padding: 1px 6px; border: 1px s
 #scare.face canvas { display: block; }
 #scare.white { opacity: 1; background: rgba(230, 240, 255, .55); transition: opacity .25s; }
 @keyframes scareShake { 0% { transform: scale(1.4); } 20% { transform: scale(1.15) translate(-8px, 5px); } 40% { transform: scale(1.2) translate(7px, -6px); } 60% { transform: scale(1.1) translate(-4px, 3px); } 100% { transform: scale(1.25); } }
+
+/* Concours */
+.countdown { font-family: var(--mono); font-size: 14px; color: var(--cyan); letter-spacing: .06em; margin: 0; }
+.note { max-width: 560px; color: #c8b8d0; font-size: 14px; line-height: 1.5; margin: 0; }
+.err { color: #ff8a94; min-height: 1.2em; margin: 0; font-size: 14px; }
+.reg { width: min(440px, 92vw); }
+.reg label { grid-template-columns: 1fr; }
+.reg input:not([type=checkbox]) { width: 100%; padding: 10px 12px; background: rgba(0, 0, 0, .45); border: 1px solid var(--line); border-radius: 6px; color: var(--ink); font-size: 15px; font-family: var(--sans); }
+.reg input:focus { outline: none; border-color: var(--cyan); }
+.reg .consent { display: flex; align-items: flex-start; gap: 10px; line-height: 1.4; font-family: var(--sans); font-size: 13px; color: #d8c8e0; }
+.reg nav { width: 100%; }
+.board td:first-child { width: 2.5em; color: var(--cyan); }
+.board tr.me td { background: rgba(255, 138, 31, .14); }
+.breakdown { width: min(620px, 94vw); font-family: var(--mono); font-size: 13px; text-align: left; }
+.breakdown .formula { background: rgba(0, 0, 0, .35); border: 1px solid var(--line); border-radius: 8px; padding: 10px 14px; line-height: 1.7; }
+.breakdown .formula b { color: var(--cyan); font-size: 16px; }
+.breakdown .status { margin: 6px 0 0; font-size: 12px; color: var(--dim); }
+.breakdown .status.bad { color: #ff8a94; }
+.breakdown table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+.breakdown th, .breakdown td { padding: 5px 8px; border-bottom: 1px solid rgba(255, 255, 255, .07); text-align: right; }
+.breakdown th:first-child, .breakdown td:first-child { text-align: left; }
+.breakdown th { color: var(--dim); font-weight: 400; font-size: 11px; text-transform: uppercase; }
+.breakdown tfoot td { font-size: 16px; color: var(--ink); border: 0; padding-top: 8px; }
+.breakdown .rank { margin-top: 12px; text-align: center; font-size: 15px; color: var(--ink); }
+.breakdown .rank b { color: var(--cyan); font-size: 22px; }
+
+/* Centrage qui reste défilable quand le contenu dépasse (justify-content: center rognerait le haut). */
+.screen > :first-child { margin-top: auto; }
+.screen > :last-child { margin-bottom: auto; }
+
+@media (max-height: 520px) {
+  .logo h1 { font-size: clamp(30px, 7vh, 44px); }
+  .logo .event { font-size: 12px; padding: 4px 12px; margin-top: 6px; }
+  .screen { gap: 8px; padding-top: 12px; padding-bottom: calc(12px + var(--safe-b)); }
+  nav button { padding: 7px 14px; }
+  .note { font-size: 12px; }
+  .reg { width: min(720px, 94vw); grid-template-columns: 1fr 1fr; gap: 8px 14px; }
+  .reg .consent, .reg .err, .reg nav { grid-column: 1 / -1; }
+  .reg nav { flex-direction: row; justify-content: center; }
+  .reg nav button { flex: 0 1 260px; }
+  .reg input:not([type=checkbox]) { padding: 7px 10px; }
+}
