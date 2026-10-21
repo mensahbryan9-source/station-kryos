@@ -11,6 +11,9 @@ export const CONFIG = {
     date: 'samedi 31 octobre 2026',
   },
 
+  // URL des Edge Functions en production (https://<projet>.supabase.co/functions/v1).
+  api: { url: '', forceRemote: false },
+
   contest: {
     // Fin du concours : samedi 24/10/2026 23:59:59, heure de Cotonou (UTC+1).
     end: '2026-10-24T23:59:59+01:00',

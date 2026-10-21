@@ -5,10 +5,15 @@
   "type": "module",
   "description": "FPS rétro en raycasting, jouable au clavier/souris et au tactile, installable en PWA.",
   "scripts": {
-    "test": "node --test tests/*.test.mjs",
+    "test": "node tools/sync-shared.mjs --check && node --test tests/scoring.test.mjs",
+    "test:api": "set -a && eval \"$(npx supabase status -o env 2>/dev/null)\" && set +a && node --test tests/api.test.mjs",
+    "sync": "node tools/sync-shared.mjs",
     "validate": "node tools/validate-levels.mjs",
     "icons": "node tools/make-icons.mjs",
     "serve": "python3 -m http.server 8080"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "devDependencies": {
+    "supabase": "^2.120.0"
+  }
 }

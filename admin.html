@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Administration du concours</title>
+  <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
+  <style>
+    :root { --bg: #0d0a10; --panel: #17121c; --ink: #ece4f2; --dim: #9a8fa6; --line: #2e2536; --accent: #ff8a1f; --red: #ff4a5a; --ok: #3ad08a; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+    header { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; padding: 14px 20px; border-bottom: 1px solid var(--line); background: var(--panel); position: sticky; top: 0; z-index: 2; }
+    h1 { font-size: 17px; margin: 0; }
+    h1 span { color: var(--dim); font-weight: 400; }
+    main { padding: 18px 20px 60px; max-width: 1400px; margin: 0 auto; }
+    section { margin-bottom: 28px; }
+    h2 { font-size: 15px; margin: 0 0 10px; color: var(--accent); text-transform: uppercase; letter-spacing: .06em; }
+    .stats { display: flex; flex-wrap: wrap; gap: 10px; }
+    .stat { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px 14px; min-width: 150px; }
+    .stat b { display: block; font-size: 22px; font-variant-numeric: tabular-nums; }
+    .stat small { color: var(--dim); }
+    .scroll { overflow-x: auto; border: 1px solid var(--line); border-radius: 8px; }
+    table { border-collapse: collapse; width: 100%; background: var(--panel); }
+    th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+    th { color: var(--dim); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; background: #1d1724; }
+    td.num { text-align: right; font-variant-numeric: tabular-nums; }
+    tr.sus td { background: rgba(255, 74, 90, .07); }
+    tr.hid td { opacity: .55; }
+    .badge { display: inline-block; padding: 1px 7px; border-radius: 999px; font-size: 11px; background: rgba(255, 74, 90, .18); color: #ffb1b9; }
+    .flags { white-space: normal; color: #ffb1b9; font-size: 12px; max-width: 520px; }
+    button, input { font: inherit; }
+    button { background: #251d2c; color: var(--ink); border: 1px solid var(--line); border-radius: 6px; padding: 6px 12px; cursor: pointer; }
+    button:hover { border-color: var(--accent); }
+    button.danger { border-color: #6a2a32; color: #ffb1b9; }
+    button.danger:hover { background: #3a1419; border-color: var(--red); }
+    button.small { padding: 2px 8px; font-size: 12px; }
+    input { background: #0f0b13; color: var(--ink); border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; }
+    #login { max-width: 360px; margin: 12vh auto; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 24px; display: grid; gap: 12px; }
+    #login p { margin: 0; color: var(--dim); }
+    .err { color: var(--red); min-height: 1.2em; }
+    .tools { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+    dialog { background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 10px; max-width: min(1000px, 94vw); width: 100%; padding: 0; }
+    dialog::backdrop { background: rgba(0, 0, 0, .65); }
+    dialog .in { padding: 18px 20px; max-height: 80vh; overflow: auto; }
+    dialog h3 { margin: 0 0 10px; }
+    .kv { display: grid; grid-template-columns: max-content 1fr; gap: 4px 14px; margin-bottom: 14px; }
+    .kv dt { color: var(--dim); }
+    .kv dd { margin: 0; }
+    .muted { color: var(--dim); }
+    @media (max-width: 700px) { header, main { padding-left: 12px; padding-right: 12px; } }
+  </style>
+</head>
+<body>
+  <form id="login" hidden>
+    <h1>Administration <span>· Le Manoir des Ombres</span></h1>
+    <p>Mot de passe défini dans le secret Supabase <code>ADMIN_PASSWORD</code>.</p>
+    <input type="password" id="pw" placeholder="Mot de passe" autocomplete="current-password" required>
+    <button type="submit">Se connecter</button>
+    <div class="err" id="loginErr"></div>
+  </form>
+
+  <div id="app" hidden>
+    <header>
+      <h1>Concours Halloween <span id="endInfo"></span></h1>
+      <div class="tools">
+        <button id="refresh">Actualiser</button>
+        <button id="csv">Exporter le classement (CSV)</button>
+        <button id="logout">Se déconnecter</button>
+      </div>
+    </header>
+    <main>
+      <section class="stats" id="stats"></section>
+      <section>
+        <h2>Classement complet</h2>
+        <p class="muted">Départage des égalités : la partie la plus ancienne gagne. Les parties suspectes sont surlignées : vérifiez le détail avant de remettre le lot.</p>
+        <div class="scroll"><table id="rank"></table></div>
+      </section>
+      <section>
+        <h2>Parties suspectes (<span id="susCount">0</span>)</h2>
+        <div class="scroll"><table id="sus"></table></div>
+      </section>
+      <section>
+        <h2>Après le concours</h2>
+        <p class="muted">Une fois le lot remis, supprimez toutes les données personnelles et les parties. Cette action est définitive.</p>
+        <button class="danger" id="purge">Supprimer toutes les données…</button>
+      </section>
+    </main>
+  </div>
+
+  <dialog id="detail"><div class="in" id="detailBody"></div></dialog>
+
+<script type="module">
+import { request, apiBase } from './js/api.js';
+import { CONFIG } from './js/config.js';
+
+const $ = (s) => document.querySelector(s);
+const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const fmtDate = (d) => d ? new Date(d).toLocaleString('fr-FR', { timeZone: CONFIG.contest.timezone, dateStyle: 'short', timeStyle: 'medium' }) : '';
+const fmtNum = (n) => Number(n).toLocaleString('fr-FR');
+const STATUS = { active: 'en cours', finished: 'terminée', abandoned: 'interrompue' };
+const st = (v) => STATUS[v] || v;
+let pw = sessionStorage.getItem('adminPw') || '';
+
+const admin = (route, body, raw) => request('admin', route, { body, raw, headers: { 'x-admin-password': pw } });
+
+async function load() {
+  let data;
+  try { data = await admin('overview'); }
+  catch (e) {
+    if (e.status === 401) { sessionStorage.removeItem('adminPw'); pw = ''; showLogin(e.message); return; }
+    alert(e.message); return;
+  }
+  $('#login').hidden = true; $('#app').hidden = false;
+  const end = new Date(CONFIG.contest.end);
+  $('#endInfo').textContent = `· fin le ${fmtDate(end)} (heure de Cotonou) · ${Date.now() < end ? 'en cours' : 'terminé, classement figé'}`;
+  const sus = data.ranking.filter((r) => r.suspicious).length;
+  $('#stats').innerHTML = [
+    ['Joueurs inscrits', data.stats.players], ['Parties lancées', data.stats.sessions],
+    ['Joueurs classés', data.ranking.length], ['Classés suspects', sus],
+  ].map(([k, v]) => `<div class="stat"><b>${fmtNum(v ?? 0)}</b><small>${k}</small></div>`).join('');
+
+  $('#rank').innerHTML = `<tr><th>#</th><th>Pseudo</th><th>Prénom</th><th>Nom</th><th>Contact</th><th>Score</th><th>Niveaux</th><th>Difficulté</th><th>Obtenu le</th><th></th><th></th></tr>` +
+    data.ranking.map((r) => `<tr class="${r.suspicious ? 'sus' : ''} ${r.hidden ? 'hid' : ''}">
+      <td class="num">${r.rank}</td><td>${esc(r.pseudo)} ${r.suspicious ? '<span class="badge">suspect</span>' : ''}</td>
+      <td>${esc(r.firstName)}</td><td>${esc(r.lastName)}</td><td>${esc(r.contact)}</td>
+      <td class="num"><b>${fmtNum(r.score)}</b></td><td class="num">${r.levels}/5</td><td>${esc(r.difficulty)}</td><td>${fmtDate(r.achievedAt)}</td>
+      <td><button class="small" data-detail="${r.sessionId}">Détail</button></td>
+      <td><button class="small" data-hide="${r.playerId}" data-hidden="${r.hidden}">${r.hidden ? 'Afficher le pseudo' : 'Masquer le pseudo'}</button></td>
+    </tr>`).join('') || '<tr><td colspan="11" class="muted">Aucun score pour le moment.</td></tr>';
+
+  $('#susCount').textContent = data.suspicious.length;
+  $('#sus').innerHTML = `<tr><th>Joueur</th><th>Difficulté</th><th>Statut</th><th>Score</th><th>Niveaux</th><th>Commencée</th><th>Motifs</th><th></th></tr>` +
+    data.suspicious.map((s) => `<tr><td>${esc(s.pseudo)}</td><td>${esc(s.difficulty)}</td><td>${esc(st(s.status))}</td><td class="num">${fmtNum(s.total_score)}</td>
+      <td class="num">${s.next_level}</td><td>${fmtDate(s.started_at)}</td><td class="flags">${s.flags.map(esc).join('<br>')}</td>
+      <td><button class="small" data-detail="${s.id}">Détail</button></td></tr>`).join('') || '<tr><td colspan="8" class="muted">Aucune partie suspecte.</td></tr>';
+}
+
+async function detail(id) {
+  const d = await admin(`session?id=${id}`);
+  const s = d.session, p = s.players;
+  $('#detailBody').innerHTML = `<h3>Partie de ${esc(p.pseudo)}</h3>
+    <dl class="kv"><dt>Joueur</dt><dd>${esc(p.first_name)} ${esc(p.last_name)} — ${esc(p.contact)}</dd>
+    <dt>Difficulté</dt><dd>${esc(CONFIG.difficulties[s.difficulty].name)} (×${CONFIG.difficulties[s.difficulty].scoreMult})</dd>
+    <dt>Statut</dt><dd>${esc(st(s.status))} — ${s.next_level} niveau(x) — total <b>${fmtNum(s.total_score)}</b></dd>
+    <dt>Début / fin</dt><dd>${fmtDate(s.started_at)} → ${fmtDate(s.ended_at || s.last_event_at)}</dd>
+    <dt>Navigateur</dt><dd class="muted">${esc(s.user_agent)}</dd>
+    <dt>Signalements</dt><dd class="flags">${s.flags.map(esc).join('<br>') || '—'}</dd></dl>
+    <div class="scroll"><table><tr><th>Niveau</th><th>Ennemis</th><th>Secrets</th><th>PV fin</th><th>Morts</th><th>Temps jeu</th><th>Temps réel*</th><th>Points</th><th>× diff.</th><th>× temps</th><th>Score</th><th>Reçu</th></tr>
+    ${d.levels.map((l) => `<tr><td>${l.level + 1}${l.late ? ' <span class="badge">délai de grâce</span>' : ''}</td><td class="num">${l.kills.length}</td><td class="num">${l.secrets.length}</td>
+      <td class="num">${l.hp_end}</td><td class="num">${l.deaths}</td><td class="num">${l.client_time.toFixed(1)} s</td><td class="num">${l.server_elapsed.toFixed(0)} s</td>
+      <td class="num">${fmtNum(l.points)}</td><td class="num">${l.diff_mult}</td><td class="num">${l.time_coef}</td><td class="num"><b>${fmtNum(l.score)}</b></td><td>${fmtDate(l.received_at)}</td></tr>`).join('')}
+    </table></div>
+    <p class="muted">* temps réel écoulé depuis le début de la partie, mesuré par le serveur.</p>
+    <h3>Toutes les parties de ce joueur</h3>
+    <div class="scroll"><table><tr><th>Commencée</th><th>Difficulté</th><th>Statut</th><th>Niveaux</th><th>Score</th><th></th></tr>
+    ${d.otherSessions.map((o) => `<tr><td>${fmtDate(o.started_at)}</td><td>${esc(CONFIG.difficulties[o.difficulty].name)}</td><td>${esc(st(o.status))}</td><td class="num">${o.next_level}</td><td class="num">${fmtNum(o.total_score)}</td><td>${o.suspicious ? '<span class="badge">suspect</span>' : ''}</td></tr>`).join('')}
+    </table></div>
+    <p><button onclick="this.closest('dialog').close()">Fermer</button></p>`;
+  $('#detail').showModal();
+}
+
+document.addEventListener('click', async (e) => {
+  const b = e.target.closest('button');
+  if (!b) return;
+  if (b.dataset.detail) detail(b.dataset.detail).catch((err) => alert(err.message));
+  if (b.dataset.hide) { await admin('hide', { playerId: b.dataset.hide, hidden: b.dataset.hidden !== 'true' }); load(); }
+});
+$('#refresh').onclick = load;
+$('#logout').onclick = () => { sessionStorage.removeItem('adminPw'); pw = ''; showLogin(); };
+$('#csv').onclick = async () => {
+  const res = await admin('export', null, true);
+  const url = URL.createObjectURL(await res.blob());
+  Object.assign(document.createElement('a'), { href: url, download: `classement-manoir-${new Date().toISOString().slice(0, 10)}.csv` }).click();
+  URL.revokeObjectURL(url);
+};
+$('#purge').onclick = async () => {
+  const t = prompt('Cette action supprime DÉFINITIVEMENT tous les joueurs, coordonnées, parties et scores.\nTapez SUPPRIMER TOUT pour confirmer :');
+  if (t !== 'SUPPRIMER TOUT') return;
+  if (!confirm('Dernière confirmation : tout supprimer maintenant ?')) return;
+  try { await admin('purge', { confirm: 'SUPPRIMER TOUT' }); alert('Toutes les données ont été supprimées.'); load(); }
+  catch (e) { alert(e.message); }
+};
+
+function showLogin(msg = '') {
+  $('#app').hidden = true; $('#login').hidden = false;
+  $('#loginErr').textContent = msg;
+  if (!apiBase()) $('#loginErr').textContent = 'URL de l\'API non configurée (CONFIG.api.url).';
+  $('#pw').focus();
+}
+$('#login').onsubmit = (e) => { e.preventDefault(); pw = $('#pw').value; sessionStorage.setItem('adminPw', pw); load(); };
+if (pw) load(); else showLogin();
+</script>
+</body>
+</html>
