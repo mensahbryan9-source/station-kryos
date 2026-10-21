@@ -12,7 +12,7 @@ export const CONFIG = {
   },
 
   // URL des Edge Functions en production (https://<projet>.supabase.co/functions/v1).
-  api: { url: '', forceRemote: false },
+  api: { url: 'https://qbghpplxnxzhwovobozu.supabase.co/functions/v1', forceRemote: false },
 
   contest: {
     // Fin du concours : samedi 24/10/2026 23:59:59, heure de Cotonou (UTC+1).
