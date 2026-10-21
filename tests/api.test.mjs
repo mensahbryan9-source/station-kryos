@@ -13,6 +13,7 @@ const ANON = process.env.ANON_KEY;
 const SERVICE = process.env.SERVICE_ROLE_KEY;
 const ADMIN = process.env.ADMIN_PASSWORD || (() => { try { return /ADMIN_PASSWORD=(.*)/.exec(readFileSync('supabase/functions/.env', 'utf8'))[1]; } catch { return ''; } })();
 const skip = !API && 'API_URL non défini';
+const LOCAL = /127\.0\.0\.1|localhost/.test(API || '');
 
 let ipCounter = 0;
 const freshIp = () => `10.0.${(ipCounter >> 8) & 255}.${ipCounter++ & 255}`;
@@ -20,7 +21,8 @@ const uniq = () => Math.random().toString(36).slice(2, 8);
 
 async function call(fn, route, { body, method = body ? 'POST' : 'GET', ip = '10.9.9.9', headers = {} } = {}) {
   const res = await fetch(`${API}/functions/v1/${fn}/${route}`, {
-    method, headers: { 'content-type': 'application/json', 'cf-connecting-ip': ip, ...headers },
+    // En local on simule plusieurs IP ; en production Cloudflare refuse cet en-tête (erreur 1000).
+    method, headers: { 'content-type': 'application/json', ...(LOCAL ? { 'cf-connecting-ip': ip } : {}), ...headers },
     body: body ? JSON.stringify(body) : undefined,
   });
   const text = await res.text();
