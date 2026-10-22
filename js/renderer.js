@@ -11,6 +11,7 @@ export class Renderer {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d', { alpha: false });
     this.fov = 66;
+    this.brightness = 1; // réglage de luminosité des options
     // Profil du cône de la lampe : 0..256 selon r² (r = distance au centre / rayon).
     this.cone = new Int32Array(CONE_SIZE);
     for (let i = 0; i < CONE_SIZE; i++) {
@@ -57,11 +58,12 @@ export class Renderer {
     const dirX = Math.cos(p.a), dirY = Math.sin(p.a);
     const planeX = -dirY * k, planeY = dirX * k;
     const proj = w / (2 * k);
-    const horizon = (h >> 1) + (p.bobY * h) | 0;
+    // Visée verticale par cisaillement : l'horizon monte ou descend avec p.pitch.
+    const horizon = (h >> 1) + ((p.bobY + (p.pitch || 0)) * h) | 0;
     const px = p.x, py = p.y;
     const L = game.lighting();
     this.fogR = L.fog[0]; this.fogG = L.fog[1]; this.fogB = L.fog[2];
-    this.fogDist = L.fogDist; this.ambient = L.ambient; this.flash = L.flash; this.emissive = L.emissive;
+    this.fogDist = L.fogDist; this.ambient = L.ambient * this.brightness; this.flash = L.flash * this.brightness; this.emissive = L.emissive;
     const lt = [0, 0, 0, 0, 0, 0];
     const floorT = T[game.floorTex], ceilT = T[game.ceilTex];
     const doorSide = T[game.doorSideTex];
@@ -69,9 +71,11 @@ export class Renderer {
     const cone = this.cone, CT = this.colTerm, RT = this.rowTerm;
 
     // Termes du cône (r² × 1024) par colonne et par ligne, centrés sur le viseur.
-    const R = h * 0.5, R2 = 1024 / (R * R), cx = w / 2;
+    const R = h * 0.62, R2 = 1024 / (R * R), cx = w / 2;
     for (let x = 0; x < w; x++) { const v = ((x - cx) * (x - cx) * R2) | 0; CT[x] = v > 2047 ? 2047 : v; }
-    for (let y = 0; y < h; y++) { const v = ((y - horizon) * (y - horizon) * R2) | 0; RT[y] = v > 2047 ? 2047 : v; }
+    // le faisceau de la lampe reste centré sur le viseur (milieu de l'écran)
+    const cy = h >> 1;
+    for (let y = 0; y < h; y++) { const v = ((y - cy) * (y - cy) * R2) | 0; RT[y] = v > 2047 ? 2047 : v; }
 
     // Pré-calcul par ligne pour le sol et le plafond.
     const RD = this.rowDist, RB = this.rowBase, RF = this.rowFlash, RG = this.rowFog;

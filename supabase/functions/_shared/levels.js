@@ -29,7 +29,7 @@ export const LEVELS = [
       "Minuit, la nuit d'Halloween. Le portail du vieux cimetière s'est refermé derrière vous et les tombes ne sont plus vides. " +
       "Trouvez la clé bleue et gagnez le portail scellé au fond des caveaux. Votre lampe chauffe vite : éteignez-la (touche F) pour qu'elle se recharge.",
     floor: 'dirt', ceiling: 'nightSky',
-    fog: [5, 6, 14], fogDist: 10, ambient: 0.24, flicker: 0.2,
+    fog: [14, 16, 28], fogDist: 13, ambient: 0.46, flicker: 0.12,
     angle: 0,
     secretTex: 'stoneMoss',
     doors: ['doorWood', 'doorWoodBlue', 'doorWoodRed'], doorSide: 'doorSideStone', exitOff: 'gateOff', exitOn: 'gateOn',
@@ -72,7 +72,7 @@ export const LEVELS = [
       "Sous le cimetière s'étendent des galeries tapissées d'ossements. Les fantômes y rôdent en silence. " +
       "Deux clés ouvrent le chemin vers la crypte : la bleue, puis la rouge, gardée au fond des grottes.",
     floor: 'flagstone', ceiling: 'vault',
-    fog: [4, 4, 6], fogDist: 9, ambient: 0.16, flicker: 0.3,
+    fog: [12, 12, 16], fogDist: 12, ambient: 0.38, flicker: 0.2,
     angle: 0,
     secretTex: 'bones',
     doors: ['doorWood', 'doorWoodBlue', 'doorWoodRed'], doorSide: 'doorSideStone', exitOff: 'gateOff', exitOn: 'gateOn',
@@ -119,7 +119,7 @@ export const LEVELS = [
       "Les murs suintent et les cierges brûlent sans flamme visible. Au cœur de la crypte veille le Gardien, " +
       "un crâne colossal couronné de bougies. Le portail ne s'ouvrira qu'après sa chute.",
     floor: 'flagstone', ceiling: 'vault',
-    fog: [12, 2, 4], fogDist: 9, ambient: 0.13, flicker: 0.45,
+    fog: [24, 8, 10], fogDist: 12, ambient: 0.34, flicker: 0.3,
     angle: 0,
     secretTex: 'stoneBlood',
     doors: ['doorWood', 'doorWoodBlue', 'doorWoodRed'], doorSide: 'doorSideStone', exitOff: 'gateOff', exitOn: 'gateOn',
@@ -169,7 +169,7 @@ export const LEVELS = [
       "Au sortir de la crypte, le manoir se dresse enfin. Un labyrinthe de haies et une serre en ruine vous en séparent. " +
       "La clé bleue repose quelque part sous les vitres brisées.",
     floor: 'dirt', ceiling: 'nightSky',
-    fog: [6, 8, 10], fogDist: 9.5, ambient: 0.2, flicker: 0.15,
+    fog: [14, 18, 22], fogDist: 12.5, ambient: 0.42, flicker: 0.1,
     angle: -Math.PI / 2,
     secretTex: 'hedge',
     doors: ['doorWood', 'doorWoodBlue', 'doorWoodRed'], doorSide: 'doorSideStone', exitOff: 'gateOff', exitOn: 'gateOn',
@@ -216,7 +216,7 @@ export const LEVELS = [
       "Les portraits vous suivent du regard. Quelque part dans la salle de bal, le Roi Citrouille attend son dernier invité. " +
       "Clé bleue à la bibliothèque, clé rouge dans la chambre du maître… puis mettez fin à cette nuit.",
     floor: 'woodFloor', ceiling: 'beams',
-    fog: [8, 4, 6], fogDist: 9, ambient: 0.15, flicker: 0.35,
+    fog: [18, 10, 14], fogDist: 12, ambient: 0.36, flicker: 0.22,
     angle: -Math.PI / 2,
     secretTex: 'wallpaper',
     doors: ['doorWood', 'doorWoodBlue', 'doorWoodRed'], doorSide: 'doorSideStone', exitOff: 'gateOff', exitOn: 'gateOn',

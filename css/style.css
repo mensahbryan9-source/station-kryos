@@ -84,7 +84,8 @@ button, select, input { font: inherit; color: inherit; }
 .b-fire { right: calc(26px + var(--safe-r)); bottom: calc(96px + var(--safe-b)); width: 96px; height: 96px; font-size: 17px; border-color: rgba(255, 59, 78, .7); background: rgba(80, 10, 20, .45); }
 .b-fire.on { background: rgba(255, 59, 78, .45); }
 .b-use { right: calc(134px + var(--safe-r)); bottom: calc(150px + var(--safe-b)); width: 64px; height: 64px; font-size: 13px; }
-.b-next { right: calc(130px + var(--safe-r)); bottom: calc(76px + var(--safe-b)); width: 54px; height: 54px; font-size: 22px; }
+.b-next { right: calc(128px + var(--safe-r)); bottom: calc(76px + var(--safe-b)); width: 58px; height: 58px; font-size: 16px; line-height: 1; }
+.b-next small { display: block; font-size: 10px; letter-spacing: .08em; }
 .b-lamp { right: calc(196px + var(--safe-r)); bottom: calc(96px + var(--safe-b)); width: 48px; height: 48px; font-size: 20px; }
 .b-pause { left: calc(14px + var(--safe-l)); top: 60px; width: 42px; height: 42px; font-size: 13px; }
 .b-map { left: calc(64px + var(--safe-l)); top: 60px; width: 42px; height: 42px; font-size: 18px; }
@@ -207,3 +208,20 @@ kbd { font-family: var(--mono); font-size: 12px; padding: 1px 6px; border: 1px s
   .reg nav button { flex: 0 1 260px; }
   .reg input:not([type=checkbox]) { padding: 7px 10px; }
 }
+
+/* Aide en jeu : objectif, action possible, capture de la souris */
+#objective { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); max-width: 60vw; text-align: center; pointer-events: none;
+  font-family: var(--mono); font-size: 13px; letter-spacing: .04em; color: #f4e8d8; background: var(--glass); border: 1px solid var(--line); border-radius: 999px; padding: 5px 14px; }
+#objective b { color: var(--cyan); }
+#bossbar:not([hidden]) ~ #objective { top: 52px; }
+#prompt { position: absolute; left: 50%; bottom: calc(96px + var(--safe-b)); transform: translateX(-50%); pointer-events: none; font-family: var(--mono); font-size: 15px;
+  color: #fff; background: rgba(0, 0, 0, .6); border: 1px solid var(--cyan); border-radius: 6px; padding: 6px 14px; text-shadow: 0 0 6px rgba(255, 138, 31, .6); }
+#prompt.locked { border-color: var(--red); color: #ffb3b9; }
+#lockhint { position: absolute; left: 50%; top: 58%; transform: translateX(-50%); pointer-events: none; font-family: var(--mono); font-size: 15px;
+  color: #fff; background: rgba(0, 0, 0, .65); border: 1px solid var(--line); border-radius: 8px; padding: 10px 16px; animation: blink 1.6s infinite; }
+.controls-card { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; width: min(720px, 94vw); }
+.controls-card div { background: var(--glass); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; font-size: 13px; line-height: 1.4; color: #e8d8c8; }
+.controls-card b { display: block; color: var(--cyan); font-family: var(--mono); font-size: 13px; margin-bottom: 2px; }
+@media (max-height: 520px) { #prompt { bottom: calc(70px + var(--safe-b)); font-size: 13px; } .controls-card div { padding: 5px 8px; font-size: 12px; } }
+#app:not(.playing) #objective, #app:not(.playing) #prompt, #app:not(.playing) #lockhint { display: none !important; }
+.touch #hud kbd { display: none; }

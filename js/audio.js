@@ -111,24 +111,22 @@ class Audio {
       while (next < ctx.currentTime + 0.25) {
         const bar = Math.floor(step / 16), pos = step % 16;
         const chordRoot = cfg.root + prog[bar % prog.length];
-        // basse
-        if (pos % 4 === 0 || pos === 14) this.osc('sawtooth', midi(chordRoot - 12), midi(chordRoot - 12), beat * 1.8, 0.22, lp, next - ctx.currentTime);
-        // nappe
+        // basse grave et feutrée, deux fois par mesure
+        if (pos === 0 || pos === 8) this.osc('sine', midi(chordRoot - 12), midi(chordRoot - 12), beat * 7, 0.2, lp, next - ctx.currentTime, 0.08);
+        // nappe sombre
         if (pos === 0) {
           for (const iv of [0, 7, 12 + cfg.scale[1]]) {
-            const o = this.osc('triangle', midi(chordRoot + iv), midi(chordRoot + iv), beat * 15, 0.05, lp, next - ctx.currentTime, beat * 4);
+            const o = this.osc('triangle', midi(chordRoot + iv), midi(chordRoot + iv), beat * 15, 0.045, lp, next - ctx.currentTime, beat * 4);
             o.detune.value = (Math.random() - 0.5) * 14;
           }
         }
-        // arpège
-        if (pos % 2 === 0 && Math.random() < 0.8) {
+        // boîte à musique : notes rares et claires, deux octaves au-dessus
+        if (pos % 4 === 2 && Math.random() < 0.6) {
           const deg = cfg.scale[(step * 3 + bar) % cfg.scale.length];
-          this.osc(cfg.arp || 'square', midi(chordRoot + 12 + deg + (pos > 8 ? 12 : 0)), midi(chordRoot + 12 + deg), beat * 0.9, 0.035, lp, next - ctx.currentTime);
+          this.osc('sine', midi(chordRoot + 24 + deg), midi(chordRoot + 24 + deg), beat * 3, 0.05, lp, next - ctx.currentTime, 0.004);
         }
-        // percussions
-        if (pos % 8 === 0) this.osc('sine', 120, 40, 0.25, 0.5, this.mus, next - ctx.currentTime);
-        if (pos % 8 === 4) this.noise(0.12, 0.18, this.mus, { type: 'bandpass', f0: 1800, f1: 900, q: 0.8, t: next - ctx.currentTime });
-        if (pos % 2 === 1) this.noise(0.03, 0.05, this.mus, { type: 'highpass', f0: 7000, f1: 6000, t: next - ctx.currentTime });
+        // battement sourd, une fois par mesure
+        if (pos === 0) this.osc('sine', 62, 34, 0.35, 0.28, this.mus, next - ctx.currentTime);
         next += beat; step++;
       }
     };
@@ -141,32 +139,29 @@ class Audio {
     this.seqTimer = null;
   }
 
-  // ——— Ambiance de fond : vent (extérieur) ou bourdon (intérieur) + bruits aléatoires ———
+  // ——— Ambiance de fond : bourdon grave qui ondule + sons d'atmosphère rares ———
   startAmbience(kind) {
     this.stopAmbience();
     if (!this.ctx) return;
     const ctx = this.ctx;
-    const src = ctx.createBufferSource(); src.buffer = this.noiseBuf; src.loop = true;
-    const f = ctx.createBiquadFilter(); f.type = 'bandpass'; f.Q.value = kind === 'outdoor' ? 0.7 : 2.5;
-    f.frequency.value = kind === 'outdoor' ? 420 : 140;
-    const g = ctx.createGain(); g.gain.value = kind === 'outdoor' ? 0.16 : 0.1;
-    const lfo = ctx.createOscillator(), lg = ctx.createGain();
-    lfo.frequency.value = 0.13; lg.gain.value = kind === 'outdoor' ? 260 : 40;
-    lfo.connect(lg); lg.connect(f.frequency);
-    src.connect(f); f.connect(g); g.connect(this.sfx);
-    src.start(); lfo.start();
-    const nodes = [src, lfo];
-    if (kind !== 'outdoor') {
-      const o = ctx.createOscillator(); o.type = 'sine'; o.frequency.value = 46;
-      const og = ctx.createGain(); og.gain.value = 0.05; o.connect(og); og.connect(this.sfx); o.start(); nodes.push(o);
+    const g = ctx.createGain(); g.gain.value = 0.05; g.connect(this.sfx);
+    const trem = ctx.createOscillator(), tg = ctx.createGain();
+    trem.frequency.value = 0.08; tg.gain.value = 0.03; trem.connect(tg); tg.connect(g.gain);
+    const base = kind === 'outdoor' ? 49 : 41.2;
+    const nodes = [trem];
+    for (const [mult, det] of [[1, -6], [1, 6], [1.5, 0], [2.02, 0]]) {
+      const o = ctx.createOscillator(); o.type = 'sine'; o.frequency.value = base * mult; o.detune.value = det;
+      const og = ctx.createGain(); og.gain.value = mult > 1.6 ? 0.25 : 0.6;
+      o.connect(og); og.connect(g); o.start(); nodes.push(o);
     }
+    trem.start();
     this.amb = { nodes, timer: setInterval(() => {
-      if (Math.random() < 0.55) return;
+      if (Math.random() < 0.5) return;
       const pool = AMBIENT_EVENTS[kind] || AMBIENT_EVENTS.indoor;
       const name = pool[(Math.random() * pool.length) | 0];
-      const a = Math.random() * 6.28, d = 4 + Math.random() * 8, L = this.listener;
-      this.play(name, { x: L.x + Math.cos(a) * d, y: L.y + Math.sin(a) * d }, 0.8);
-    }, 5000) };
+      const a = Math.random() * 6.28, d = 5 + Math.random() * 8, L = this.listener;
+      this.play(name, { x: L.x + Math.cos(a) * d, y: L.y + Math.sin(a) * d }, 0.5);
+    }, 7000) };
   }
 
   stopAmbience() {
@@ -280,8 +275,8 @@ Object.assign(SOUNDS, {
   chains: (a, o) => { for (let i = 0; i < 6; i++) a.osc('triangle', 2400 + Math.random() * 1500, 2000, 0.06, 0.06, o, i * 0.07); },
 });
 const AMBIENT_EVENTS = {
-  outdoor: ['owl', 'crow', 'creak', 'scream', 'whisper'],
-  indoor: ['drip', 'creak', 'chains', 'whisper', 'scream', 'drip'],
+  outdoor: ['owl', 'crow', 'creak', 'owl'],
+  indoor: ['drip', 'creak', 'chains', 'whisper', 'drip'],
 };
 
 export const audio = new Audio();

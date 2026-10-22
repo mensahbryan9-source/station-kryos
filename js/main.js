@@ -22,7 +22,7 @@ const SAVE_KEY = 'manoir-save-v1';
 const isTouch = matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window;
 const defaults = {
   unlocked: 1, best: 0,
-  opts: { sens: 1, fov: 70, sfx: 0.8, music: 0.5, quality: 'auto', minimap: true, touch: isTouch, scares: true },
+  opts: { sens: 1, fov: 70, sfx: 0.8, music: 0.5, quality: 'auto', minimap: true, touch: isTouch, scares: true, brightness: 1, invertY: false },
 };
 let save;
 try { save = { ...defaults, ...JSON.parse(localStorage.getItem(SAVE_KEY) || '{}') }; save.opts = { ...defaults.opts, ...save.opts }; }
@@ -206,22 +206,38 @@ function buildLevelList() {
   });
 }
 
-async function newGame(diff) {
+function newGame(diff) {
   pendingDiff = diff;
-  let ranked = pendingRanked && contest.player && contest.open && contest.configured;
-  if (ranked) {
-    $('#diff-err').textContent = 'Connexion au serveur du concours…';
-    try { await contest.startRun(diff); }
-    catch (e) {
-      $('#diff-err').textContent = e.status === 0 ? 'Serveur injoignable : impossible de démarrer une partie classée.' : e.message;
-      if (e.status === 401) contest.forget();
-      $('#diff-offline').hidden = false;
+  const ranked = !!(pendingRanked && contest.player && contest.open && contest.configured);
+  session = { difficulty: diff, levelIndex: 0, inventory: newPlayerState(LEVELS[0].loadout), totalTime: 0, ranked, deaths: 0, played: 0 };
+  // La session classée est demandée en arrière-plan pendant la lecture du briefing.
+  if (ranked) session.runReady = contest.startRun(diff).then(() => null, (e) => e);
+  brief();
+}
+
+$('#b-go').onclick = async () => {
+  const btn = $('#b-go');
+  if (session.runReady) {
+    btn.disabled = true; btn.textContent = 'Connexion au concours…';
+    const err = await session.runReady;
+    session.runReady = null;
+    btn.disabled = false; btn.textContent = 'Entrer';
+    if (err) {
+      if (err.status === 401) contest.forget();
+      session.ranked = false;
+      $('#b-err').textContent = `${err.status === 0 ? 'Serveur du concours injoignable' : err.message} : cette partie ne sera pas classée. « Entrer » pour jouer quand même, ou Échap pour revenir au menu.`;
       return;
     }
   }
-  session = { difficulty: diff, levelIndex: 0, inventory: newPlayerState(LEVELS[0].loadout), totalTime: 0, ranked: !!ranked, deaths: 0, played: 0 };
-  brief();
-}
+  startLevel();
+};
+
+const CONTROLS = {
+  desktop: [['Se déplacer', 'Z Q S D (ou W A S D, flèches)'], ['Viser', 'Souris — cliquez d\'abord dans le jeu'], ['Tirer', 'Clic gauche · armes : 1-5 ou molette'],
+    ['Ouvrir / activer', 'Espace ou E face à une porte'], ['Lampe', 'F — se recharge quand elle est éteinte'], ['Carte', 'Tab ou M · pause : Échap']],
+  touch: [['Se déplacer', 'Pouce gauche (joystick)'], ['Viser', 'Glisser à droite, aussi en haut / en bas'], ['Tirer', 'Maintenir FEU'],
+    ['Ouvrir / activer', 'USE face à une porte'], ['Lampe', '☀ — se recharge quand elle est éteinte'], ['Arme', 'ARME ▸ pour changer']],
+};
 
 function brief() {
   const L = LEVELS[session.levelIndex];
@@ -229,12 +245,13 @@ function brief() {
   $('#b-sub').textContent = L.subtitle.toUpperCase();
   $('#b-name').textContent = L.name;
   $('#b-text').textContent = L.briefing;
+  $('#b-err').textContent = '';
+  $('#b-controls').innerHTML = CONTROLS[save.opts.touch ? 'touch' : 'desktop'].map(([k, v]) => `<div><b>${k}</b>${v}</div>`).join('');
   screenStack = [];
   state = 'brief';
   showScreen('brief');
   audio.play('select');
 }
-$('#b-go').onclick = () => startLevel();
 
 function startLevel() {
   const L = LEVELS[session.levelIndex];
@@ -422,6 +439,7 @@ addEventListener('keydown', (e) => {
   if (e.code === 'Tab' || e.code === 'KeyM') { e.preventDefault(); if (state === 'play') toggleMap(); }
   if (e.code === 'KeyP' || e.code === 'Escape') {
     if (state === 'play') pause();
+    else if (state === 'brief') { if (session && session.ranked) contest.endRun(); toTitle(); }
     else if (state === 'pause' && currentScreen() === 'pause') resume();
     else if (screenStack.length) back();
   }
@@ -453,9 +471,13 @@ bindOption('#o-quality', 'quality');
 bindOption('#o-minimap', 'minimap');
 bindOption('#o-touch', 'touch');
 bindOption('#o-scares', 'scares');
+bindOption('#o-bright', 'brightness', (v) => Math.round(v * 100) + ' %');
+bindOption('#o-invert', 'invertY');
 function applyOptions() {
   input.sensitivity = save.opts.sens;
   renderer.fov = save.opts.fov;
+  renderer.brightness = save.opts.brightness;
+  input.invertY = save.opts.invertY;
   audio.setVolumes(save.opts.sfx, save.opts.music);
   $('#minimap').classList.toggle('on', save.opts.minimap);
 }
@@ -495,9 +517,10 @@ function drawWeapon(ctx, w, h) {
 }
 
 // ——— HUD ———
-const H = { bat: $('#h-bat'), health: $('#h-health'), armor: $('#h-armor'), ammo: $('#h-ammo'), wname: $('#h-wname'), score: $('#h-score'), kb: $('#k-blue'), kr: $('#k-red'), bossbar: $('#bossbar'), bossfill: $('#bossbar i'), bossname: $('#bossbar span') };
+const H = { objective: $('#objective'), prompt: $('#prompt'), lockhint: $('#lockhint'), bat: $('#h-bat'), health: $('#h-health'), armor: $('#h-armor'), ammo: $('#h-ammo'), wname: $('#h-wname'), score: $('#h-score'), kb: $('#k-blue'), kr: $('#k-red'), bossbar: $('#bossbar'), bossfill: $('#bossbar i'), bossname: $('#bossbar span') };
 const last = {};
 function setText(el, key, v) { if (last[key] !== v) { last[key] = v; el.textContent = v; } }
+function setHtml(el, key, v) { if (last[key] !== v) { last[key] = v; el.innerHTML = v; } }
 function updateHud() {
   const p = game.player, wp = WEAPONS[p.cur];
   setText(H.health, 'h', p.health);
@@ -514,6 +537,12 @@ function updateHud() {
   H.bat.classList.toggle('charging', !!p.recharging || (!p.lamp && p.battery < 100));
   H.kb.classList.toggle('on', p.keys.blue);
   H.kr.classList.toggle('on', p.keys.red);
+  setHtml(H.objective, 'obj', '🎯 ' + game.objective());
+  H.objective.hidden = false;
+  const f = game.facing();
+  H.prompt.hidden = !f;
+  if (f) { setText(H.prompt, 'pr', f.locked ? f.text : `${save.opts.touch ? 'USE' : '[Espace]'} : ${f.text}`); H.prompt.classList.toggle('locked', !!f.locked); }
+  H.lockhint.hidden = !(state === 'play' && !save.opts.touch && document.pointerLockElement !== view);
   const b = game.boss;
   const showBoss = b && b.state !== 'idle' && b.state !== 'dead';
   H.bossbar.hidden = !showBoss;

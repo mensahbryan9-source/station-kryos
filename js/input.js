@@ -6,11 +6,13 @@ export class Input {
     this.canvas = canvas;
     this.keys = new Set();
     this.mouseDX = 0;
+    this.mouseDY = 0;
+    this.invertY = false;
     this.mouseDown = false;
     this.edges = { use: false, fire: false, weapon: null, next: 0, lamp: false };
     this.sensitivity = 1;
     this.enabled = false;
-    this.touch = { move: null, look: null, fire: false, lookDX: 0, mx: 0, my: 0 };
+    this.touch = { move: null, look: null, fire: false, lookDX: 0, lookDY: 0, mx: 0, my: 0 };
     this.onAction = () => {};
 
     addEventListener('keydown', (e) => {
@@ -35,7 +37,7 @@ export class Input {
     addEventListener('mouseup', (e) => { if (e.button === 0) this.mouseDown = false; });
     canvas.addEventListener('contextmenu', (e) => e.preventDefault());
     addEventListener('mousemove', (e) => {
-      if (document.pointerLockElement === canvas) this.mouseDX += e.movementX;
+      if (document.pointerLockElement === canvas) { this.mouseDX += e.movementX; this.mouseDY += e.movementY; }
     });
     addEventListener('wheel', (e) => {
       if (this.enabled && document.pointerLockElement === canvas) this.edges.next = e.deltaY > 0 ? 1 : -1;
@@ -66,11 +68,11 @@ export class Input {
     // Bouton de tir : maintenir pour tirer, glisser pour viser en même temps.
     const fireEl = btn('.b-fire', (e) => {
       T.fire = true; this.edges.fire = true;
-      const t = e.changedTouches[0]; T.fireLook = { id: t.identifier, x: t.clientX };
+      const t = e.changedTouches[0]; T.fireLook = { id: t.identifier, x: t.clientX, y: t.clientY };
     }, () => { T.fire = false; T.fireLook = null; });
     fireEl.addEventListener('touchmove', (e) => {
       e.preventDefault();
-      for (const t of e.changedTouches) if (T.fireLook && t.identifier === T.fireLook.id) { T.lookDX += t.clientX - T.fireLook.x; T.fireLook.x = t.clientX; }
+      for (const t of e.changedTouches) if (T.fireLook && t.identifier === T.fireLook.id) { T.lookDX += t.clientX - T.fireLook.x; T.lookDY += t.clientY - T.fireLook.y; T.fireLook.x = t.clientX; T.fireLook.y = t.clientY; }
     }, { passive: false });
     btn('.b-use', () => { this.edges.use = true; });
     btn('.b-next', () => { this.edges.next = 1; });
@@ -87,7 +89,7 @@ export class Input {
           stick.style.left = t.clientX + 'px'; stick.style.top = t.clientY + 'px'; stick.classList.add('on');
           knob.style.transform = 'translate(-50%,-50%)';
         } else if (!left && !T.look) {
-          T.look = { id: t.identifier, x: t.clientX };
+          T.look = { id: t.identifier, x: t.clientX, y: t.clientY };
         }
       }
     }, { passive: false });
@@ -102,7 +104,7 @@ export class Input {
           T.mx = dx / R; T.my = dy / R;
           knob.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
         } else if (T.look && t.identifier === T.look.id) {
-          T.lookDX += t.clientX - T.look.x; T.look.x = t.clientX;
+          T.lookDX += t.clientX - T.look.x; T.lookDY += t.clientY - T.look.y; T.look.x = t.clientX; T.look.y = t.clientY;
         }
       }
     }, { passive: false });
@@ -133,18 +135,24 @@ export class Input {
     if (altStrafe) { strafe += turnKeys; turnKeys = 0; }
     let turn = turnKeys * 2.6 * dt + this.mouseDX * 0.0024 * this.sensitivity;
     this.mouseDX = 0;
+    this.mouseDY = 0;
+    this.invertY = false;
     // tactile
     if (T.move) { forward += -T.my * 1.05; strafe += T.mx * 1.05; }
     turn += T.lookDX * 0.0065 * this.sensitivity; T.lookDX = 0;
+    // visée verticale (vers le haut = valeur positive)
+    let look = -(this.mouseDY * 0.0012 + T.lookDY * 0.0028) * this.sensitivity;
+    this.mouseDY = 0; T.lookDY = 0;
     let fire = this.mouseDown || has('ControlLeft', 'ControlRight') || T.fire;
     let firePressed = this.edges.fire;
-    const out = { forward: 0, strafe: 0, turn, run: has('ShiftLeft', 'ShiftRight'), fire, firePressed, use: this.edges.use, weapon: this.edges.weapon, nextWeapon: this.edges.next, lamp: this.edges.lamp };
+    const out = { forward: 0, strafe: 0, turn, look: this.invertY ? -look : look, run: has('ShiftLeft', 'ShiftRight'), fire, firePressed, use: this.edges.use, weapon: this.edges.weapon, nextWeapon: this.edges.next, lamp: this.edges.lamp };
     // manette
     const g = this.gamepad();
     if (g) {
       const dz = (v) => (Math.abs(v) < 0.15 ? 0 : v);
       forward -= dz(g.axes[1]); strafe += dz(g.axes[0]);
       out.turn += dz(g.axes[2]) * 3 * dt * this.sensitivity;
+      out.look -= dz(g.axes[3]) * 1.2 * dt * this.sensitivity;
       const prev = this.padPrev || [];
       const pressed = (i) => g.buttons[i] && g.buttons[i].pressed;
       const edge = (i) => pressed(i) && !prev[i];

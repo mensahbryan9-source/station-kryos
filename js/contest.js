@@ -22,6 +22,8 @@ class Contest extends EventTarget {
     addEventListener('online', () => this.flush());
     setInterval(() => this.flush(), 20000);
     setTimeout(() => this.flush(), 1500);
+    // Réveille les fonctions Supabase (démarrage à froid de quelques secondes) dès l'ouverture.
+    setTimeout(() => { if (this.configured) request('game', 'health').catch(() => {}); }, 300);
   }
 
   get configured() { return !!apiBase(); }

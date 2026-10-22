@@ -68,7 +68,7 @@ export class Game {
       x: world.start.x, y: world.start.y, a: level.angle || 0,
       ...inv, keys: { blue: false, red: false },
       cooldown: 0, fireAnim: 0, switchAnim: 0, bob: 0, bobY: 0, moving: 0, dead: false, deadT: 0, stepAcc: 0,
-      hurtDir: 0, lamp: true, battery: inv.battery ?? 100,
+      hurtDir: 0, pitch: 0, lamp: true, battery: inv.battery ?? 100,
     };
     this.enemies = []; this.items = []; this.decor = []; this.projectiles = []; this.effects = [];
     // killIds / secretIds : événements bruts envoyés au serveur pour recalculer le score.
@@ -210,6 +210,7 @@ export class Game {
   updatePlayer(dt, input) {
     const p = this.player, w = this.world;
     p.a += input.turn;
+    p.pitch = Math.max(-0.4, Math.min(0.4, p.pitch + (input.look || 0)));
     const speed = 3.3 * (input.run ? 1.45 : 1);
     const cos = Math.cos(p.a), sin = Math.sin(p.a);
     let mx = (cos * input.forward - sin * input.strafe) * speed * dt;
@@ -462,6 +463,36 @@ export class Game {
     } else {
       audio.play('dry', null, 0.4);
     }
+  }
+
+  // Aide contextuelle : ce que le joueur a devant lui, s'il peut interagir.
+  facing() {
+    const p = this.player, w = this.world;
+    const tx = Math.floor(p.x + Math.cos(p.a) * 0.9), ty = Math.floor(p.y + Math.sin(p.a) * 0.9);
+    const t = w.cellType(tx, ty);
+    if (t === DOOR) {
+      const d = w.door(tx, ty);
+      if (d.open > 0.5) return null;
+      if (d.lock && !p.keys[d.lock]) return { text: `Porte verrouillée — il faut la clé ${d.lock === 'blue' ? 'BLEUE' : 'ROUGE'}`, locked: true };
+      return { text: 'Ouvrir la porte' };
+    }
+    if (t === EXIT) {
+      if (this.level.requireBoss && this.bossAlive()) return { text: `Portail scellé — terrassez ${this.boss.d.name.toLowerCase()}`, locked: true };
+      return { text: 'Ouvrir le portail de sortie' };
+    }
+    return null;
+  }
+
+  bossAlive() { return !!this.boss && this.boss.state !== 'dead' && this.boss.state !== 'dying'; }
+
+  // Objectif courant, affiché en haut de l'écran.
+  objective() {
+    const p = this.player, lv = this.level;
+    this.locks ||= { blue: lv.map.some((r) => r.includes('B')), red: lv.map.some((r) => r.includes('R')) };
+    if (this.locks.blue && !p.keys.blue) return 'Trouvez la <b>clé bleue</b>';
+    if (this.locks.red && !p.keys.red) return 'Trouvez la <b>clé rouge</b>';
+    if (lv.requireBoss && this.bossAlive()) return `Terrassez <b>${this.boss.d.name.toLowerCase()}</b>`;
+    return 'Rejoignez le <b>portail de sortie</b>';
   }
 
   results() {
